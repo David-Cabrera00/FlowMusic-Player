@@ -27,6 +27,7 @@ export function NowPlaying({
   onNext
 }: NowPlayingProps) {
   const canPlayTrack = Boolean(currentTrack?.hasAudioSource())
+  const hasTrack = Boolean(currentTrack)
 
   return (
     <section className="now-playing-card">
@@ -51,9 +52,16 @@ export function NowPlaying({
               ? `${currentTrack.artist} • ${currentTrack.album}`
               : 'Agrega o selecciona una canción para comenzar'}
           </p>
-          <small>
-            {currentTrack ? `${elapsedTime} / ${totalTime}` : '00:00 / --:--'}
-          </small>
+
+          {!hasTrack ? (
+            <small>00:00 / --:--</small>
+          ) : canPlayTrack ? (
+            <small>
+              {elapsedTime} / {totalTime}
+            </small>
+          ) : (
+            <small>Esta canción no tiene archivo de audio asociado.</small>
+          )}
         </div>
 
         <div className="now-playing-controls">

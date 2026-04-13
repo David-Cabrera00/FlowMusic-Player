@@ -1,4 +1,5 @@
 import {
+  Heart,
   Pause,
   Play,
   SkipBack,
@@ -18,12 +19,14 @@ interface PlayerBarProps {
   canGoNext: boolean
   volume: number
   isMuted: boolean
+  isFavorite: boolean
   onPrevious: () => void
   onPlay: () => void
   onPause: () => void
   onNext: () => void
   onVolumeChange: (value: number) => void
   onToggleMute: () => void
+  onToggleFavorite: () => void
 }
 
 export function PlayerBar({
@@ -36,13 +39,16 @@ export function PlayerBar({
   canGoNext,
   volume,
   isMuted,
+  isFavorite,
   onPrevious,
   onPlay,
   onPause,
   onNext,
   onVolumeChange,
-  onToggleMute
+  onToggleMute,
+  onToggleFavorite
 }: PlayerBarProps) {
+  const canPlayTrack = Boolean(currentTrack?.hasAudioSource())
   const hasTrack = Boolean(currentTrack)
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : Volume2
 
@@ -72,6 +78,16 @@ export function PlayerBar({
                 : 'Selecciona una canción para comenzar'}
             </span>
           </div>
+
+          <button
+            type="button"
+            className={`player-favorite-button ${isFavorite ? 'active' : ''}`}
+            onClick={onToggleFavorite}
+            disabled={!hasTrack}
+            title={isFavorite ? 'Quitar de favoritas' : 'Agregar a favoritas'}
+          >
+            <Heart size={18} />
+          </button>
         </div>
 
         <div className="player-bar-center">
@@ -85,7 +101,7 @@ export function PlayerBar({
                 type="button"
                 className="player-primary-button"
                 onClick={onPause}
-                disabled={!hasTrack}
+                disabled={!canPlayTrack}
               >
                 <Pause size={18} />
               </button>
@@ -94,7 +110,7 @@ export function PlayerBar({
                 type="button"
                 className="player-primary-button"
                 onClick={onPlay}
-                disabled={!hasTrack}
+                disabled={!canPlayTrack}
               >
                 <Play size={18} />
               </button>

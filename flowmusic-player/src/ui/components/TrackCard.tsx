@@ -41,6 +41,7 @@ export function TrackCard({
 
         <div className="playlist-track-meta">
           <span>{track.duration}</span>
+          <small>{track.hasAudioSource() ? 'Audio listo' : 'Solo demo'}</small>
         </div>
       </div>
 

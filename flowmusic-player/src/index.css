@@ -1010,4 +1010,20 @@ input {
     right: 16px;
     bottom: 16px;
   }
+}.player-favorite-button {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--bg-card-strong);
+  color: var(--text-main);
+  border: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.player-favorite-button.active {
+  color: #ec4899;
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(236, 72, 153, 0.28);
 }

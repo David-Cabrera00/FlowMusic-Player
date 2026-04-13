@@ -347,7 +347,10 @@ export default function HomePage() {
       })
 
       if (createdTracks.length > 0) {
+        const firstImportedTrack = createdTracks[0]
+        player.select(firstImportedTrack.id)
         setActiveSection('biblioteca')
+        appendHistory(firstImportedTrack)
       }
 
       refreshView()
@@ -663,6 +666,15 @@ export default function HomePage() {
     selectedTrack.toggleFavorite()
     setTracks([...playlist.toArray()])
   }
+  
+  const handleToggleCurrentFavorite = (): void => {
+  if (!currentTrack) {
+    return
+  }
+
+  handleToggleFavorite(currentTrack.id)
+  setCurrentTrack(playlist.getCurrentTrack())
+}
 
   const handleBurnTrack = (track: Track): void => {
     const alreadyExists = burnedTracks.some((item) => item.track.id === track.id)
@@ -922,21 +934,23 @@ export default function HomePage() {
       </div>
 
       <PlayerBar
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        progressPercent={progressPercent}
-        elapsedTime={elapsedTime}
-        totalTime={totalTime}
-        canGoPrevious={canGoPrevious}
-        canGoNext={canGoNext}
-        volume={volume}
-        isMuted={isMuted}
-        onPrevious={handlePrevious}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onNext={handleNext}
-        onVolumeChange={handleVolumeChange}
-        onToggleMute={handleToggleMute}
+      currentTrack={currentTrack}
+      isPlaying={isPlaying}
+      progressPercent={progressPercent}
+      elapsedTime={elapsedTime}
+      totalTime={totalTime}
+      canGoPrevious={canGoPrevious}
+      canGoNext={canGoNext}
+      volume={volume}
+      isMuted={isMuted}
+      isFavorite={Boolean(currentTrack?.isFavorite)}
+      onPrevious={handlePrevious}
+      onPlay={handlePlay}
+      onPause={handlePause}
+      onNext={handleNext}
+      onVolumeChange={handleVolumeChange}
+      onToggleMute={handleToggleMute}
+      onToggleFavorite={handleToggleCurrentFavorite}
       />
 
       <audio

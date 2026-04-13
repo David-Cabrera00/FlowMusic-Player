@@ -1027,3 +1027,157 @@ input {
   background: rgba(236, 72, 153, 0.12);
   border-color: rgba(236, 72, 153, 0.28);
 }
+.dashboard-layout--focused {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.dashboard-layout--focused .center-panel {
+  max-width: none;
+}
+
+.now-playing-card {
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.now-playing-cover-wrap {
+  width: 160px;
+  height: 160px;
+}
+
+.player-bar-main {
+  padding: 14px 18px;
+  grid-template-columns: 1.05fr 1.15fr 220px;
+}
+
+.player-bar-cover-wrap,
+.player-bar-avatar {
+  width: 56px;
+  height: 56px;
+}
+
+.player-bar-controls button {
+  width: 42px;
+  height: 42px;
+}
+
+.player-bar-progress-row {
+  grid-template-columns: 50px 1fr 50px;
+  font-size: 0.86rem;
+}
+
+.sidebar-link,
+.theme-toggle,
+.library-toolbar-button,
+.library-clear-button,
+.icon-control-button,
+.primary-play-button,
+.track-action-button,
+.player-bar-controls button,
+.player-favorite-button,
+.volume-icon-button,
+.playlist-track-card,
+.collection-card,
+.history-card,
+.now-playing-card,
+.playlist-section-card,
+.form-section {
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease,
+    border-color 0.22s ease,
+    color 0.22s ease,
+    opacity 0.22s ease;
+}
+
+.sidebar-link:hover,
+.library-toolbar-button:hover,
+.library-clear-button:hover,
+.icon-control-button:hover,
+.track-action-button:hover,
+.player-bar-controls button:hover,
+.volume-icon-button:hover,
+.player-favorite-button:hover {
+  transform: translateY(-2px);
+}
+
+.playlist-track-card:hover,
+.collection-card:hover,
+.history-card:hover,
+.now-playing-card:hover,
+.playlist-section-card:hover,
+.form-section:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.primary-play-button:hover,
+.player-primary-button:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 30px rgba(6, 182, 212, 0.18),
+    0 6px 18px rgba(124, 58, 237, 0.18);
+}
+
+.sidebar-link:active,
+.library-toolbar-button:active,
+.library-clear-button:active,
+.icon-control-button:active,
+.primary-play-button:active,
+.track-action-button:active,
+.player-bar-controls button:active,
+.player-favorite-button:active,
+.volume-icon-button:active {
+  transform: scale(0.98);
+}
+
+.player-favorite-button svg {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.player-favorite-button.active svg {
+  transform: scale(1.12);
+}
+
+.playlist-track-card.current {
+  box-shadow:
+    inset 0 0 0 1px rgba(56, 189, 248, 0.12),
+    0 10px 24px rgba(56, 189, 248, 0.08);
+}
+
+.player-bar-trackline {
+  height: 7px;
+}
+
+.player-bar-fill {
+  transition: width 0.22s linear;
+}
+
+@media (max-width: 1380px) {
+  .dashboard-layout--focused {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .dashboard-layout--focused {
+    grid-template-columns: 1fr;
+  }
+
+  .now-playing-card {
+    grid-template-columns: 1fr;
+  }
+
+  .now-playing-cover-wrap {
+    width: 100%;
+    height: 220px;
+  }
+
+  .player-bar-main {
+    grid-template-columns: 1fr;
+    padding: 14px 16px;
+  }
+}

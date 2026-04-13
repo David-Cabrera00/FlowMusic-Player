@@ -24,6 +24,22 @@ export function TrackForm({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const normalizeTextInput = (value: string): string => {
+    return value.replace(/^\s+/, '')
+  }
+
+  const normalizeStoredText = (value: string): string => {
+    return value.trim().replace(/\s{2,}/g, ' ')
+  }
+
+  const sanitizeDurationInput = (value: string): string => {
+    return value.replace(/\s+/g, '').replace(/[^0-9:]/g, '')
+  }
+
+  const sanitizePositionInput = (value: string): string => {
+    return value.replace(/\s+/g, '').replace(/[^0-9]/g, '')
+  }
+
   const clearForm = (): void => {
     setTitle('')
     setArtist('')
@@ -35,7 +51,12 @@ export function TrackForm({
   }
 
   const validateForm = (): boolean => {
-    if (!title.trim() || !artist.trim() || !album.trim() || !duration.trim()) {
+    const cleanTitle = normalizeStoredText(title)
+    const cleanArtist = normalizeStoredText(artist)
+    const cleanAlbum = normalizeStoredText(album)
+    const cleanDuration = duration.trim()
+
+    if (!cleanTitle || !cleanArtist || !cleanAlbum || !cleanDuration) {
       setError('Completa todos los campos obligatorios.')
       setSuccess('')
       return false
@@ -43,7 +64,7 @@ export function TrackForm({
 
     const durationPattern = /^\d{1,2}:\d{2}$/
 
-    if (!durationPattern.test(duration.trim())) {
+    if (!durationPattern.test(cleanDuration)) {
       setError('La duración debe tener formato mm:ss.')
       setSuccess('')
       return false
@@ -58,13 +79,13 @@ export function TrackForm({
 
     return new Track(
       generatedId,
-      title.trim(),
-      artist.trim(),
-      album.trim(),
+      normalizeStoredText(title),
+      normalizeStoredText(artist),
+      normalizeStoredText(album),
       duration.trim(),
-      cover.trim() || fallbackCover,
+      normalizeStoredText(cover) || fallbackCover,
       false,
-      audioSrc.trim()
+      normalizeStoredText(audioSrc)
     )
   }
 
@@ -137,7 +158,7 @@ export function TrackForm({
             id="title"
             type="text"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => setTitle(normalizeTextInput(event.target.value))}
             placeholder="Ejemplo: Aurora Urbana"
           />
         </div>
@@ -148,7 +169,7 @@ export function TrackForm({
             id="artist"
             type="text"
             value={artist}
-            onChange={(event) => setArtist(event.target.value)}
+            onChange={(event) => setArtist(normalizeTextInput(event.target.value))}
             placeholder="Ejemplo: Nova Beat"
           />
         </div>
@@ -159,7 +180,7 @@ export function TrackForm({
             id="album"
             type="text"
             value={album}
-            onChange={(event) => setAlbum(event.target.value)}
+            onChange={(event) => setAlbum(normalizeTextInput(event.target.value))}
             placeholder="Ejemplo: Skyline Dreams"
           />
         </div>
@@ -170,7 +191,7 @@ export function TrackForm({
             id="duration"
             type="text"
             value={duration}
-            onChange={(event) => setDuration(event.target.value)}
+            onChange={(event) => setDuration(sanitizeDurationInput(event.target.value))}
             placeholder="03:45"
           />
         </div>
@@ -181,7 +202,7 @@ export function TrackForm({
             id="cover"
             type="text"
             value={cover}
-            onChange={(event) => setCover(event.target.value)}
+            onChange={(event) => setCover(normalizeTextInput(event.target.value))}
             placeholder="Opcional"
           />
         </div>
@@ -192,7 +213,7 @@ export function TrackForm({
             id="audioSrc"
             type="text"
             value={audioSrc}
-            onChange={(event) => setAudioSrc(event.target.value)}
+            onChange={(event) => setAudioSrc(normalizeTextInput(event.target.value))}
             placeholder="Opcional por ahora"
           />
         </div>
@@ -201,11 +222,10 @@ export function TrackForm({
           <label htmlFor="position">Posición</label>
           <input
             id="position"
-            type="number"
-            min={0}
-            max={playlistSize}
+            type="text"
+            inputMode="numeric"
             value={position}
-            onChange={(event) => setPosition(event.target.value)}
+            onChange={(event) => setPosition(sanitizePositionInput(event.target.value))}
             placeholder={`0 a ${playlistSize}`}
           />
         </div>

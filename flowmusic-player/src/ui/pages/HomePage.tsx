@@ -715,8 +715,9 @@ export default function HomePage() {
   }
 
   const handleSearchChange = (value: string): void => {
-    setSearchTerm(value)
-  }
+  const normalizedValue = value.replace(/^\s+/, '').replace(/\s{2,}/g, ' ')
+  setSearchTerm(normalizedValue)
+}
 
   const handleVolumeChange = (value: number): void => {
     setVolume(value)
@@ -768,9 +769,11 @@ export default function HomePage() {
   }
 
   const libraryTracks = filterTracksBySearch(tracks)
-  const filteredFavorites = filterTracksBySearch(favoriteTracks)
-  const filteredBurned = filterTracksBySearch(burnedOnlyTracks)
-  const filteredHistory = filterTracksBySearch(historyOnlyTracks)
+const filteredFavorites = filterTracksBySearch(favoriteTracks)
+const filteredBurned = filterTracksBySearch(burnedOnlyTracks)
+const filteredHistory = filterTracksBySearch(historyOnlyTracks)
+const homePreviewTracks = libraryTracks.slice(0, 6)
+const showAuxiliaryPanel = activeSection === 'biblioteca'
 
   const totalTime = currentTrack
     ? durationSeconds > 0
@@ -790,7 +793,9 @@ export default function HomePage() {
 
   return (
     <div className="app-shell">
-      <div className="dashboard-layout">
+      <div
+  className={`dashboard-layout ${showAuxiliaryPanel ? '' : 'dashboard-layout--focused'}`}
+        >
         <Sidebar
           theme={theme}
           activeSection={activeSection}
@@ -828,24 +833,24 @@ export default function HomePage() {
             onNext={handleNext}
           />
 
-          {activeSection === 'inicio' || activeSection === 'biblioteca' ? (
+          {activeSection === 'biblioteca' ? (
             <TrackForm
               playlistSize={tracks.length}
               onAddToStart={handleAddToStart}
               onAddToEnd={handleAddToEnd}
               onAddToPosition={handleAddToPosition}
             />
-          ) : null}
+            ) : null}
 
           {activeSection === 'inicio' ? (
             <TrackList
-              tracks={libraryTracks}
+              tracks={homePreviewTracks}
               totalSourceCount={tracks.length}
               currentTrackId={currentTrack?.id ?? null}
-              title="Toda la biblioteca"
-              subtitle="Administra la secuencia principal del reproductor."
+              title="Accesos rápidos"
+              subtitle="Selección principal de tu biblioteca."
               emptyTitle="Tu biblioteca está vacía"
-              emptyDescription="Agrega una nueva canción desde el formulario o importa archivos locales para comenzar."
+              emptyDescription="Agrega una nueva canción o importa archivos para comenzar."
               emptySearchMessage="No se encontraron canciones con esa búsqueda."
               onSelect={handleSelectTrack}
               onToggleFavorite={handleToggleFavorite}
@@ -923,14 +928,16 @@ export default function HomePage() {
           ) : null}
         </main>
 
-        <aside className="right-panel">
-          <CollectionPanels
-            favoriteTracks={favoriteTracks}
-            burnedTracks={burnedTracks}
-          />
+        {showAuxiliaryPanel ? (
+          <aside className="right-panel">
+            <CollectionPanels
+              favoriteTracks={favoriteTracks}
+              burnedTracks={burnedTracks}
+            />
 
-          <HistoryPanel historyTracks={historyTracks} />
-        </aside>
+            <HistoryPanel historyTracks={historyTracks} />
+          </aside>
+        ) : null}
       </div>
 
       <PlayerBar

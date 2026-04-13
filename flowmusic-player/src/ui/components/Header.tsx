@@ -39,7 +39,7 @@ export function Header({
             type="text"
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar"
+            placeholder="Buscar por artista o albúm"
           />
         </div>
 

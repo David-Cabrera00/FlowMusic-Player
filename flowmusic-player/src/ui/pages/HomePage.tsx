@@ -13,7 +13,7 @@ import { PlayerBar } from '../components/PlayerBar'
 
 type ThemeMode = 'dark' | 'light'
 
-export function HomePage() {
+export default function HomePage() {
   const playlist = useMemo(() => {
     const instance = new FlowPlaylist()
     seedTracks.forEach((track) => instance.addToEnd(track))
@@ -50,31 +50,62 @@ export function HomePage() {
   })
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const savedTheme = localStorage.getItem('flowmusic-theme')
-
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      return savedTheme
-    }
-
-    return 'dark'
+    return savedTheme === 'light' || savedTheme === 'dark'
+      ? savedTheme
+      : 'dark'
   })
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('flowmusic-theme', theme)
-  }, [theme])
+  function parseDurationToSeconds(duration: string): number {
+    const parts = duration.split(':').map(Number)
 
-  const parseDurationToSeconds = (duration: string): number => {
-    const [minutes, seconds] = duration.split(':').map(Number)
-    return minutes * 60 + seconds
+    if (parts.length !== 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) {
+      return 0
+    }
+
+    return parts[0] * 60 + parts[1]
   }
 
-  const formatTime = (totalSeconds: number): string => {
+  function formatTime(totalSeconds: number): string {
     const safeSeconds = Math.max(0, totalSeconds)
     const minutes = Math.floor(safeSeconds / 60)
     const seconds = safeSeconds % 60
 
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
   }
+
+  function refreshView(): void {
+    setTracks([...playlist.toArray()])
+    setCurrentTrack(playlist.getCurrentTrack())
+    setIsPlaying(player.isActive())
+    setProgressPercent(player.getProgress())
+    setBurnedCount(burnCollection.getAll().length)
+    setBurnedTracks(burnCollection.getAll())
+  }
+
+  function appendHistory(track: Track | null): void {
+    if (!track) {
+      return
+    }
+
+    setHistoryTracks((previousHistory) => {
+      const cleanedHistory = previousHistory.filter(
+        (item) => item.id !== track.id
+      )
+
+      return [track, ...cleanedHistory].slice(0, 8)
+    })
+  }
+
+  function resetProgress(): void {
+    player.setProgress(0)
+    setProgressPercent(0)
+    setElapsedSeconds(0)
+  }
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('flowmusic-theme', theme)
+  }, [theme])
 
   useEffect(() => {
     if (!isPlaying || !currentTrack) {
@@ -83,11 +114,14 @@ export function HomePage() {
 
     const totalSeconds = parseDurationToSeconds(currentTrack.duration)
 
+    if (totalSeconds <= 0) {
+      return
+    }
+
     const intervalId = window.setInterval(() => {
       setElapsedSeconds((previousSeconds) => {
         const nextElapsedSeconds = Math.min(previousSeconds + 1, totalSeconds)
-        const nextPercent =
-          totalSeconds > 0 ? (nextElapsedSeconds / totalSeconds) * 100 : 0
+        const nextPercent = (nextElapsedSeconds / totalSeconds) * 100
 
         player.setProgress(nextPercent)
         setProgressPercent(nextPercent)
@@ -100,13 +134,7 @@ export function HomePage() {
 
           if (nextTrack && nextTrack.id !== previousTrackId) {
             player.play()
-            setHistoryTracks((previousHistory) => {
-              const cleanedHistory = previousHistory.filter(
-                (item) => item.id !== nextTrack.id
-              )
-
-              return [nextTrack, ...cleanedHistory].slice(0, 8)
-            })
+            appendHistory(nextTrack)
 
             setTimeout(() => {
               setElapsedSeconds(0)
@@ -114,6 +142,7 @@ export function HomePage() {
             }, 0)
           } else {
             player.pause()
+
             setTimeout(() => {
               setElapsedSeconds(totalSeconds)
               refreshView()
@@ -129,35 +158,6 @@ export function HomePage() {
       window.clearInterval(intervalId)
     }
   }, [isPlaying, currentTrack, player])
-
-  const refreshView = (): void => {
-    setTracks([...playlist.toArray()])
-    setCurrentTrack(playlist.getCurrentTrack())
-    setIsPlaying(player.isActive())
-    setProgressPercent(player.getProgress())
-    setBurnedCount(burnCollection.getAll().length)
-    setBurnedTracks(burnCollection.getAll())
-  }
-
-  const appendHistory = (track: Track | null): void => {
-    if (!track) {
-      return
-    }
-
-    setHistoryTracks((previousHistory) => {
-      const cleanedHistory = previousHistory.filter(
-        (item) => item.id !== track.id
-      )
-
-      return [track, ...cleanedHistory].slice(0, 8)
-    })
-  }
-
-  const resetProgress = (): void => {
-    player.setProgress(0)
-    setProgressPercent(0)
-    setElapsedSeconds(0)
-  }
 
   const handlePlay = (): void => {
     player.play()

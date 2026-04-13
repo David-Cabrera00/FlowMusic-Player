@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import {
   Heart,
   Pause,
@@ -53,6 +54,14 @@ export function PlayerBar({
   const canPlayTrack = Boolean(currentTrack?.hasAudioSource())
   const hasTrack = Boolean(currentTrack)
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : Volume2
+
+  const seekStyle = {
+    ['--seek-fill' as string]: `${progressPercent}%`
+  } as CSSProperties
+
+  const volumeStyle = {
+    ['--volume-fill' as string]: `${isMuted ? 0 : volume}%`
+  } as CSSProperties
 
   return (
     <footer className="player-bar-fixed">
@@ -133,6 +142,7 @@ export function PlayerBar({
               max={100}
               step={0.1}
               value={progressPercent}
+              style={seekStyle}
               disabled={!canPlayTrack}
               onChange={(event) => onSeek(Number(event.target.value))}
             />
@@ -156,6 +166,7 @@ export function PlayerBar({
             min={0}
             max={100}
             value={isMuted ? 0 : volume}
+            style={volumeStyle}
             onChange={(event) => onVolumeChange(Number(event.target.value))}
           />
         </div>

@@ -1,10 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Track } from '../../domain/models/Track'
+import { BurnedTrack } from '../../domain/models/BurnedTrack'
 import { BurnCollection } from '../../domain/services/BurnCollection'
 import { FlowPlaylist } from '../../domain/services/FlowPlaylist'
 import { PlayerController } from '../../domain/services/PlayerController'
 import { seedTracks } from '../../data/seedTracks'
 import { TrackForm } from '../components/TrackForm'
+import { ThemeToggle } from '../components/ThemeToggle'
+import { CollectionPanels } from '../components/CollectionPanels'
+
+type ThemeMode = 'dark' | 'light'
 
 export function HomePage() {
   const playlist = useMemo(() => {
@@ -29,12 +34,31 @@ export function HomePage() {
   const [burnedCount, setBurnedCount] = useState<number>(
     burnCollection.getAll().length
   )
+  const [burnedTracks, setBurnedTracks] = useState<BurnedTrack[]>(
+    burnCollection.getAll()
+  )
+  const [searchTerm, setSearchTerm] = useState<string>('')
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    const savedTheme = localStorage.getItem('flowmusic-theme')
+
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      return savedTheme
+    }
+
+    return 'dark'
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('flowmusic-theme', theme)
+  }, [theme])
 
   const refreshView = (): void => {
     setTracks([...playlist.toArray()])
     setCurrentTrack(playlist.getCurrentTrack())
     setIsPlaying(player.isActive())
     setBurnedCount(burnCollection.getAll().length)
+    setBurnedTracks(burnCollection.getAll())
   }
 
   const handlePlay = (): void => {
@@ -98,6 +122,28 @@ export function HomePage() {
     refreshView()
   }
 
+  const handleToggleTheme = (): void => {
+    setTheme((previousTheme) =>
+      previousTheme === 'dark' ? 'light' : 'dark'
+    )
+  }
+
+  const favoriteTracks = tracks.filter((track) => track.isFavorite)
+
+  const filteredTracks = tracks.filter((track) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    if (!normalizedSearch) {
+      return true
+    }
+
+    return (
+      track.title.toLowerCase().includes(normalizedSearch) ||
+      track.artist.toLowerCase().includes(normalizedSearch) ||
+      track.album.toLowerCase().includes(normalizedSearch)
+    )
+  })
+
   return (
     <div className="app-shell">
       <aside className="left-panel">
@@ -105,6 +151,8 @@ export function HomePage() {
           <h1>FlowMusic</h1>
           <p>Player académico</p>
         </div>
+
+        <ThemeToggle theme={theme} onToggle={handleToggleTheme} />
 
         <nav className="menu-box">
           <button className="menu-item active">Inicio</button>
@@ -117,8 +165,10 @@ export function HomePage() {
         <div className="summary-card">
           <h3>Resumen</h3>
           <p>Canciones: {tracks.length}</p>
+          <p>Favoritas: {favoriteTracks.length}</p>
           <p>Quemadas: {burnedCount}</p>
           <p>Estado: {isPlaying ? 'Reproduciendo' : 'En pausa'}</p>
+          <p>Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}</p>
         </div>
       </aside>
 
@@ -129,9 +179,25 @@ export function HomePage() {
             <h2>Reproductor para tu día a día</h2>
             <p>
               FlowMusic Player usa una estructura enlazada con navegación hacia
-              adelante y hacia atrás para gestionar la playlist.
+              adelante y hacia atrás para gestionar la playlist de manera
+              académica, visual y profesional.
             </p>
           </div>
+        </section>
+
+        <section className="search-card">
+          <div className="section-header">
+            <h3>Buscar canciones</h3>
+            <p>Filtra por título, artista o álbum</p>
+          </div>
+
+          <input
+            className="search-input"
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Buscar canción..."
+          />
         </section>
 
         <section className="current-track-card">
@@ -165,6 +231,11 @@ export function HomePage() {
           onAddToPosition={handleAddToPosition}
         />
 
+        <CollectionPanels
+          favoriteTracks={favoriteTracks}
+          burnedTracks={burnedTracks}
+        />
+
         <section className="list-section">
           <div className="section-header">
             <h3>Lista de canciones</h3>
@@ -172,44 +243,50 @@ export function HomePage() {
           </div>
 
           <div className="track-list">
-            {tracks.map((track, index) => {
-              const isCurrent = currentTrack?.id === track.id
+            {filteredTracks.length === 0 ? (
+              <p className="empty-state">
+                No se encontraron canciones con esa búsqueda.
+              </p>
+            ) : (
+              filteredTracks.map((track, index) => {
+                const isCurrent = currentTrack?.id === track.id
 
-              return (
-                <article
-                  key={track.id}
-                  className={`track-card ${isCurrent ? 'current' : ''}`}
-                >
-                  <div className="track-number">{index + 1}</div>
+                return (
+                  <article
+                    key={track.id}
+                    className={`track-card ${isCurrent ? 'current' : ''}`}
+                  >
+                    <div className="track-number">{index + 1}</div>
 
-                  <div className="track-details">
-                    <h4>{track.title}</h4>
-                    <p>
-                      {track.artist} • {track.album}
-                    </p>
-                    <span>{track.duration}</span>
-                  </div>
+                    <div className="track-details">
+                      <h4>{track.title}</h4>
+                      <p>
+                        {track.artist} • {track.album}
+                      </p>
+                      <span>{track.duration}</span>
+                    </div>
 
-                  <div className="track-actions">
-                    <button onClick={() => handleSelectTrack(track.id)}>
-                      Seleccionar
-                    </button>
-                    <button onClick={() => handleToggleFavorite(track.id)}>
-                      {track.isFavorite ? 'Quitar favorito' : 'Favorito'}
-                    </button>
-                    <button onClick={() => handleBurnTrack(track)}>
-                      Quemar
-                    </button>
-                    <button
-                      className="danger-button"
-                      onClick={() => handleRemoveTrack(track.id)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </article>
-              )
-            })}
+                    <div className="track-actions">
+                      <button onClick={() => handleSelectTrack(track.id)}>
+                        Seleccionar
+                      </button>
+                      <button onClick={() => handleToggleFavorite(track.id)}>
+                        {track.isFavorite ? 'Quitar favorito' : 'Favorito'}
+                      </button>
+                      <button onClick={() => handleBurnTrack(track)}>
+                        Quemar
+                      </button>
+                      <button
+                        className="danger-button"
+                        onClick={() => handleRemoveTrack(track.id)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </article>
+                )
+              })
+            )}
           </div>
         </section>
       </main>

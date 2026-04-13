@@ -1,32 +1,163 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Track } from '../../domain/models/Track'
 import { BurnedTrack } from '../../domain/models/BurnedTrack'
-import { BurnCollection } from '../../domain/services/BurnCollection'
 import { FlowPlaylist } from '../../domain/services/FlowPlaylist'
 import { PlayerController } from '../../domain/services/PlayerController'
 import { seedTracks } from '../../data/seedTracks'
+import { Sidebar } from '../components/Sidebar'
+import { Header } from '../components/Header'
+import { NowPlaying } from '../components/NowPlaying'
 import { TrackForm } from '../components/TrackForm'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { TrackList } from '../components/TrackList'
 import { CollectionPanels } from '../components/CollectionPanels'
 import { HistoryPanel } from '../components/HistoryPanel'
 import { PlayerBar } from '../components/PlayerBar'
 
 type ThemeMode = 'dark' | 'light'
 
+type StoredTrack = {
+  id: string
+  title: string
+  artist: string
+  album: string
+  duration: string
+  cover: string
+  isFavorite: boolean
+}
+
+type StoredBurnedTrack = {
+  track: StoredTrack
+  burnedAt: string
+}
+
+const TRACKS_STORAGE_KEY = 'flowmusic-tracks'
+const BURNED_STORAGE_KEY = 'flowmusic-burned'
+const HISTORY_STORAGE_KEY = 'flowmusic-history'
+const VOLUME_STORAGE_KEY = 'flowmusic-volume'
+const MUTE_STORAGE_KEY = 'flowmusic-muted'
+
+function toTrack(data: StoredTrack): Track {
+  return new Track(
+    data.id,
+    data.title,
+    data.artist,
+    data.album,
+    data.duration,
+    data.cover,
+    data.isFavorite
+  )
+}
+
+function trackToStored(track: Track): StoredTrack {
+  return {
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    album: track.album,
+    duration: track.duration,
+    cover: track.cover,
+    isFavorite: track.isFavorite
+  }
+}
+
+function burnedToStored(item: BurnedTrack): StoredBurnedTrack {
+  return {
+    track: trackToStored(item.track),
+    burnedAt: item.burnedAt.toISOString()
+  }
+}
+
+function storedToBurned(item: StoredBurnedTrack): BurnedTrack {
+  return new BurnedTrack(toTrack(item.track), new Date(item.burnedAt))
+}
+
+function cloneSeedTracks(): Track[] {
+  return seedTracks.map(
+    (track) =>
+      new Track(
+        track.id,
+        track.title,
+        track.artist,
+        track.album,
+        track.duration,
+        track.cover,
+        track.isFavorite
+      )
+  )
+}
+
+function loadStoredTracks(): Track[] {
+  try {
+    const rawValue = localStorage.getItem(TRACKS_STORAGE_KEY)
+
+    if (!rawValue) {
+      return cloneSeedTracks()
+    }
+
+    const parsedValue = JSON.parse(rawValue) as StoredTrack[]
+
+    if (!Array.isArray(parsedValue) || parsedValue.length === 0) {
+      return cloneSeedTracks()
+    }
+
+    return parsedValue.map(toTrack)
+  } catch {
+    return cloneSeedTracks()
+  }
+}
+
+function loadStoredBurnedTracks(): BurnedTrack[] {
+  try {
+    const rawValue = localStorage.getItem(BURNED_STORAGE_KEY)
+
+    if (!rawValue) {
+      return []
+    }
+
+    const parsedValue = JSON.parse(rawValue) as StoredBurnedTrack[]
+
+    if (!Array.isArray(parsedValue)) {
+      return []
+    }
+
+    return parsedValue.map(storedToBurned)
+  } catch {
+    return []
+  }
+}
+
+function loadStoredHistory(): Track[] {
+  try {
+    const rawValue = localStorage.getItem(HISTORY_STORAGE_KEY)
+
+    if (!rawValue) {
+      return []
+    }
+
+    const parsedValue = JSON.parse(rawValue) as StoredTrack[]
+
+    if (!Array.isArray(parsedValue)) {
+      return []
+    }
+
+    return parsedValue.map(toTrack)
+  } catch {
+    return []
+  }
+}
+
 export default function HomePage() {
+  const initialTracks = useMemo(() => loadStoredTracks(), [])
+
   const playlist = useMemo(() => {
     const instance = new FlowPlaylist()
-    seedTracks.forEach((track) => instance.addToEnd(track))
+    initialTracks.forEach((track) => instance.addToEnd(track))
     return instance
-  }, [])
+  }, [initialTracks])
 
   const player = useMemo(() => {
     return new PlayerController(playlist)
   }, [playlist])
-
-  const burnCollection = useMemo(() => {
-    return new BurnCollection()
-  }, [])
 
   const [tracks, setTracks] = useState<Track[]>(playlist.toArray())
   const [currentTrack, setCurrentTrack] = useState<Track | null>(
@@ -37,14 +168,17 @@ export default function HomePage() {
     player.getProgress()
   )
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
-  const [burnedCount, setBurnedCount] = useState<number>(
-    burnCollection.getAll().length
-  )
-  const [burnedTracks, setBurnedTracks] = useState<BurnedTrack[]>(
-    burnCollection.getAll()
+  const [burnedTracks, setBurnedTracks] = useState<BurnedTrack[]>(() =>
+    loadStoredBurnedTracks()
   )
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [historyTracks, setHistoryTracks] = useState<Track[]>(() => {
+    const storedHistory = loadStoredHistory()
+
+    if (storedHistory.length > 0) {
+      return storedHistory
+    }
+
     const initialTrack = playlist.getCurrentTrack()
     return initialTrack ? [initialTrack] : []
   })
@@ -53,6 +187,13 @@ export default function HomePage() {
     return savedTheme === 'light' || savedTheme === 'dark'
       ? savedTheme
       : 'dark'
+  })
+  const [volume, setVolume] = useState<number>(() => {
+    const storedVolume = Number(localStorage.getItem(VOLUME_STORAGE_KEY))
+    return Number.isNaN(storedVolume) ? 70 : storedVolume
+  })
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    return localStorage.getItem(MUTE_STORAGE_KEY) === 'true'
   })
 
   function parseDurationToSeconds(duration: string): number {
@@ -78,8 +219,6 @@ export default function HomePage() {
     setCurrentTrack(playlist.getCurrentTrack())
     setIsPlaying(player.isActive())
     setProgressPercent(player.getProgress())
-    setBurnedCount(burnCollection.getAll().length)
-    setBurnedTracks(burnCollection.getAll())
   }
 
   function appendHistory(track: Track | null): void {
@@ -106,6 +245,35 @@ export default function HomePage() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('flowmusic-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem(
+      TRACKS_STORAGE_KEY,
+      JSON.stringify(tracks.map(trackToStored))
+    )
+  }, [tracks])
+
+  useEffect(() => {
+    localStorage.setItem(
+      BURNED_STORAGE_KEY,
+      JSON.stringify(burnedTracks.map(burnedToStored))
+    )
+  }, [burnedTracks])
+
+  useEffect(() => {
+    localStorage.setItem(
+      HISTORY_STORAGE_KEY,
+      JSON.stringify(historyTracks.map(trackToStored))
+    )
+  }, [historyTracks])
+
+  useEffect(() => {
+    localStorage.setItem(VOLUME_STORAGE_KEY, String(volume))
+  }, [volume])
+
+  useEffect(() => {
+    localStorage.setItem(MUTE_STORAGE_KEY, String(isMuted))
+  }, [isMuted])
 
   useEffect(() => {
     if (!isPlaying || !currentTrack) {
@@ -160,6 +328,10 @@ export default function HomePage() {
   }, [isPlaying, currentTrack, player])
 
   const handlePlay = (): void => {
+    if (!currentTrack) {
+      return
+    }
+
     player.play()
     appendHistory(player.getCurrentTrack())
     refreshView()
@@ -170,7 +342,18 @@ export default function HomePage() {
     refreshView()
   }
 
+  const currentIndex = currentTrack
+    ? tracks.findIndex((track) => track.id === currentTrack.id)
+    : -1
+
+  const canGoPrevious = currentIndex > 0
+  const canGoNext = currentIndex >= 0 && currentIndex < tracks.length - 1
+
   const handleNext = (): void => {
+    if (!canGoNext) {
+      return
+    }
+
     const previousTrackId = currentTrack?.id
     const nextTrack = player.next()
 
@@ -184,6 +367,10 @@ export default function HomePage() {
   }
 
   const handlePrevious = (): void => {
+    if (!canGoPrevious) {
+      return
+    }
+
     const previousTrackId = currentTrack?.id
     const previousTrack = player.previous()
 
@@ -209,7 +396,30 @@ export default function HomePage() {
   }
 
   const handleRemoveTrack = (trackId: string): void => {
+    const selectedTrack = tracks.find((track) => track.id === trackId)
+
+    if (!selectedTrack) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `¿Seguro que deseas eliminar "${selectedTrack.title}" de la playlist?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    const updatedBurnedTracks = burnedTracks.filter(
+      (item) => item.track.id !== trackId
+    )
+
     playlist.removeById(trackId)
+    setBurnedTracks(updatedBurnedTracks)
+    setHistoryTracks((previousHistory) =>
+      previousHistory.filter((item) => item.id !== trackId)
+    )
+
     resetProgress()
     refreshView()
   }
@@ -222,12 +432,17 @@ export default function HomePage() {
     }
 
     selectedTrack.toggleFavorite()
-    refreshView()
+    setTracks([...playlist.toArray()])
   }
 
   const handleBurnTrack = (track: Track): void => {
-    burnCollection.add(track)
-    refreshView()
+    const alreadyExists = burnedTracks.some((item) => item.track.id === track.id)
+
+    if (alreadyExists) {
+      return
+    }
+
+    setBurnedTracks((previous) => [...previous, new BurnedTrack(track)])
   }
 
   const handleAddToStart = (track: Track): void => {
@@ -251,6 +466,23 @@ export default function HomePage() {
     )
   }
 
+  const handleClearSearch = (): void => {
+    setSearchTerm('')
+  }
+
+  const handleSearchChange = (value: string): void => {
+    setSearchTerm(value)
+  }
+
+  const handleVolumeChange = (value: number): void => {
+    setVolume(value)
+    setIsMuted(value === 0)
+  }
+
+  const handleToggleMute = (): void => {
+    setIsMuted((previous) => !previous)
+  }
+
   const favoriteTracks = tracks.filter((track) => track.isFavorite)
 
   const filteredTracks = tracks.filter((track) => {
@@ -272,153 +504,63 @@ export default function HomePage() {
 
   return (
     <div className="app-shell">
-      <aside className="left-panel">
-        <div className="brand-box">
-          <h1>FlowMusic</h1>
-          <p>Player académico</p>
-        </div>
-
-        <ThemeToggle theme={theme} onToggle={handleToggleTheme} />
-
-        <nav className="menu-box">
-          <button className="menu-item active">Inicio</button>
-          <button className="menu-item">Biblioteca</button>
-          <button className="menu-item">Favoritos</button>
-          <button className="menu-item">Quemadas</button>
-          <button className="menu-item">Historial</button>
-        </nav>
-
-        <div className="summary-card">
-          <h3>Resumen</h3>
-          <p>Canciones: {tracks.length}</p>
-          <p>Favoritas: {favoriteTracks.length}</p>
-          <p>Quemadas: {burnedCount}</p>
-          <p>Historial: {historyTracks.length}</p>
-          <p>Estado: {isPlaying ? 'Reproduciendo' : 'En pausa'}</p>
-          <p>Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}</p>
-        </div>
-      </aside>
-
-      <main className="main-panel">
-        <section className="hero-card">
-          <div>
-            <span className="tag">Reproductor</span>
-            <h2>Reproductor para tu día a día</h2>
-            <p>
-              FlowMusic Player usa una estructura enlazada con navegación hacia
-              adelante y hacia atrás para gestionar la playlist de manera
-              académica, visual y profesional.
-            </p>
-          </div>
-        </section>
-
-        <section className="search-card">
-          <div className="section-header">
-            <h3>Buscar canciones</h3>
-            <p>Filtra por título, artista o álbum</p>
-          </div>
-
-          <input
-            className="search-input"
-            type="text"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar canción..."
-          />
-        </section>
-
-        <section className="current-track-card">
-          <div className="cover-placeholder">
-            {currentTrack ? currentTrack.title.charAt(0) : '♪'}
-          </div>
-
-          <div className="current-track-info">
-            <p className="section-label">Canción actual</p>
-            <h3>{currentTrack ? currentTrack.title : 'No hay canción activa'}</h3>
-            <p>
-              {currentTrack
-                ? `${currentTrack.artist} • ${currentTrack.album}`
-                : 'Agrega canciones para comenzar'}
-            </p>
-            <p>{currentTrack ? `Duración: ${currentTrack.duration}` : ''}</p>
-          </div>
-
-          <div className="player-actions">
-            <button onClick={handlePrevious}>⏮ Anterior</button>
-            <button onClick={handlePlay}>▶ Reproducir</button>
-            <button onClick={handlePause}>⏸ Pausar</button>
-            <button onClick={handleNext}>⏭ Siguiente</button>
-          </div>
-        </section>
-
-        <TrackForm
-          playlistSize={tracks.length}
-          onAddToStart={handleAddToStart}
-          onAddToEnd={handleAddToEnd}
-          onAddToPosition={handleAddToPosition}
+      <div className="dashboard-layout">
+        <Sidebar
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+          totalTracks={tracks.length}
+          favoriteCount={favoriteTracks.length}
+          burnedCount={burnedTracks.length}
+          historyCount={historyTracks.length}
+          isPlaying={isPlaying}
         />
 
+        <main className="center-panel">
+          <Header
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
+            onClearSearch={handleClearSearch}
+          />
+
+          <NowPlaying
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            elapsedTime={elapsedTime}
+            totalTime={totalTime}
+            canGoPrevious={canGoPrevious}
+            canGoNext={canGoNext}
+            onPrevious={handlePrevious}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onNext={handleNext}
+          />
+
+          <TrackForm
+            playlistSize={tracks.length}
+            onAddToStart={handleAddToStart}
+            onAddToEnd={handleAddToEnd}
+            onAddToPosition={handleAddToPosition}
+          />
+
+          <TrackList
+            tracks={filteredTracks}
+            currentTrackId={currentTrack?.id ?? null}
+            hasTracks={tracks.length > 0}
+            onSelect={handleSelectTrack}
+            onToggleFavorite={handleToggleFavorite}
+            onBurn={handleBurnTrack}
+            onRemove={handleRemoveTrack}
+          />
+        </main>
+        <aside className="right-panel">
         <CollectionPanels
           favoriteTracks={favoriteTracks}
           burnedTracks={burnedTracks}
         />
 
         <HistoryPanel historyTracks={historyTracks} />
-
-        <section className="list-section">
-          <div className="section-header">
-            <h3>Lista de canciones</h3>
-            <p>Selecciona una canción o gestiona la playlist</p>
-          </div>
-
-          <div className="track-list">
-            {filteredTracks.length === 0 ? (
-              <p className="empty-state">
-                No se encontraron canciones con esa búsqueda.
-              </p>
-            ) : (
-              filteredTracks.map((track, index) => {
-                const isCurrent = currentTrack?.id === track.id
-
-                return (
-                  <article
-                    key={track.id}
-                    className={`track-card ${isCurrent ? 'current' : ''}`}
-                  >
-                    <div className="track-number">{index + 1}</div>
-
-                    <div className="track-details">
-                      <h4>{track.title}</h4>
-                      <p>
-                        {track.artist} • {track.album}
-                      </p>
-                      <span>{track.duration}</span>
-                    </div>
-
-                    <div className="track-actions">
-                      <button onClick={() => handleSelectTrack(track.id)}>
-                        Seleccionar
-                      </button>
-                      <button onClick={() => handleToggleFavorite(track.id)}>
-                        {track.isFavorite ? 'Quitar favorito' : 'Favorito'}
-                      </button>
-                      <button onClick={() => handleBurnTrack(track)}>
-                        Quemar
-                      </button>
-                      <button
-                        className="danger-button"
-                        onClick={() => handleRemoveTrack(track.id)}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </article>
-                )
-              })
-            )}
-          </div>
-        </section>
-      </main>
+      </aside>
+      </div>
 
       <PlayerBar
         currentTrack={currentTrack}
@@ -426,10 +568,16 @@ export default function HomePage() {
         progressPercent={progressPercent}
         elapsedTime={elapsedTime}
         totalTime={totalTime}
+        canGoPrevious={canGoPrevious}
+        canGoNext={canGoNext}
+        volume={volume}
+        isMuted={isMuted}
         onPrevious={handlePrevious}
         onPlay={handlePlay}
         onPause={handlePause}
         onNext={handleNext}
+        onVolumeChange={handleVolumeChange}
+        onToggleMute={handleToggleMute}
       />
     </div>
   )

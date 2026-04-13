@@ -18,10 +18,18 @@ export function HistoryPanel({ historyTracks }: HistoryPanelProps) {
         <div className="history-list">
           {historyTracks.map((track, index) => (
             <article key={track.id} className="history-item">
-              <div className="history-step">{index + 1}</div>
+              <div className="history-cover-wrap">
+                <img
+                  className="history-cover-image"
+                  src={track.cover}
+                  alt={`Portada de ${track.title}`}
+                />
+              </div>
 
               <div className="history-info">
-                <h4>{track.title}</h4>
+                <h4>
+                  {index + 1}. {track.title}
+                </h4>
                 <p>
                   {track.artist} • {track.album}
                 </p>

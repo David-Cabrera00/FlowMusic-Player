@@ -13,7 +13,7 @@ export function CollectionPanels({
   return (
     <section className="collections-grid">
       <article className="collection-card">
-        <div className="section-header">
+        <div className="panel-title-block">
           <h3>Favoritas</h3>
           <p>Canciones marcadas por el usuario</p>
         </div>
@@ -24,7 +24,11 @@ export function CollectionPanels({
           <div className="mini-list">
             {favoriteTracks.map((track) => (
               <div key={track.id} className="mini-card">
-                <div className="mini-avatar">{track.title.charAt(0)}</div>
+                <img
+                  className="mini-thumb-image"
+                  src={track.cover}
+                  alt={`Portada de ${track.title}`}
+                />
 
                 <div className="mini-info">
                   <h4>{track.title}</h4>
@@ -39,7 +43,7 @@ export function CollectionPanels({
       </article>
 
       <article className="collection-card">
-        <div className="section-header">
+        <div className="panel-title-block">
           <h3>Quemadas</h3>
           <p>Colección especial del sistema</p>
         </div>
@@ -50,7 +54,11 @@ export function CollectionPanels({
           <div className="mini-list">
             {burnedTracks.map((item) => (
               <div key={item.track.id} className="mini-card">
-                <div className="mini-avatar">{item.track.title.charAt(0)}</div>
+                <img
+                  className="mini-thumb-image"
+                  src={item.track.cover}
+                  alt={`Portada de ${item.track.title}`}
+                />
 
                 <div className="mini-info">
                   <h4>{item.track.title}</h4>

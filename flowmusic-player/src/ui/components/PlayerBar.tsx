@@ -27,6 +27,7 @@ interface PlayerBarProps {
   onVolumeChange: (value: number) => void
   onToggleMute: () => void
   onToggleFavorite: () => void
+  onSeek: (value: number) => void
 }
 
 export function PlayerBar({
@@ -46,7 +47,8 @@ export function PlayerBar({
   onNext,
   onVolumeChange,
   onToggleMute,
-  onToggleFavorite
+  onToggleFavorite,
+  onSeek
 }: PlayerBarProps) {
   const canPlayTrack = Boolean(currentTrack?.hasAudioSource())
   const hasTrack = Boolean(currentTrack)
@@ -124,12 +126,16 @@ export function PlayerBar({
           <div className="player-bar-progress-row">
             <span>{elapsedTime}</span>
 
-            <div className="player-bar-trackline">
-              <div
-                className="player-bar-fill"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+            <input
+              className="player-progress-slider"
+              type="range"
+              min={0}
+              max={100}
+              step={0.1}
+              value={progressPercent}
+              disabled={!canPlayTrack}
+              onChange={(event) => onSeek(Number(event.target.value))}
+            />
 
             <span>{totalTime}</span>
           </div>

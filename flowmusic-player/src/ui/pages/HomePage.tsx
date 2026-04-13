@@ -731,6 +731,28 @@ export default function HomePage() {
   const handleOpenFilesImport = (): void => {
     fileInputRef.current?.click()
   }
+  const handleSeek = (value: number): void => {
+    const audio = audioRef.current
+
+    if (!audio || !currentTrack?.hasAudioSource()) {
+      return
+    }
+
+    const totalDuration = Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration
+      : durationSeconds
+
+    if (totalDuration <= 0) {
+      return
+    }
+
+    const nextTime = (value / 100) * totalDuration
+
+    audio.currentTime = nextTime
+    setElapsedSeconds(Math.floor(nextTime))
+    setProgressPercent(value)
+    player.setProgress(value)
+  }
 
   const handleOpenFolderImport = (): void => {
     folderInputRef.current?.click()
@@ -940,24 +962,25 @@ const showAuxiliaryPanel = activeSection === 'biblioteca'
         ) : null}
       </div>
 
-      <PlayerBar
-      currentTrack={currentTrack}
-      isPlaying={isPlaying}
-      progressPercent={progressPercent}
-      elapsedTime={elapsedTime}
-      totalTime={totalTime}
-      canGoPrevious={canGoPrevious}
-      canGoNext={canGoNext}
-      volume={volume}
-      isMuted={isMuted}
-      isFavorite={Boolean(currentTrack?.isFavorite)}
-      onPrevious={handlePrevious}
-      onPlay={handlePlay}
-      onPause={handlePause}
-      onNext={handleNext}
-      onVolumeChange={handleVolumeChange}
-      onToggleMute={handleToggleMute}
-      onToggleFavorite={handleToggleCurrentFavorite}
+        <PlayerBar
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        progressPercent={progressPercent}
+        elapsedTime={elapsedTime}
+        totalTime={totalTime}
+        canGoPrevious={canGoPrevious}
+        canGoNext={canGoNext}
+        volume={volume}
+        isMuted={isMuted}
+        isFavorite={Boolean(currentTrack?.isFavorite)}
+        onPrevious={handlePrevious}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onNext={handleNext}
+        onVolumeChange={handleVolumeChange}
+        onToggleMute={handleToggleMute}
+        onToggleFavorite={handleToggleCurrentFavorite}
+        onSeek={handleSeek}
       />
 
       <audio

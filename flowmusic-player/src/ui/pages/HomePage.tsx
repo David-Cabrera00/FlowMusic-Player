@@ -8,6 +8,8 @@ import { seedTracks } from '../../data/seedTracks'
 import { TrackForm } from '../components/TrackForm'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { CollectionPanels } from '../components/CollectionPanels'
+import { HistoryPanel } from '../components/HistoryPanel'
+import { PlayerBar } from '../components/PlayerBar'
 
 type ThemeMode = 'dark' | 'light'
 
@@ -31,6 +33,10 @@ export function HomePage() {
     playlist.getCurrentTrack()
   )
   const [isPlaying, setIsPlaying] = useState<boolean>(player.isActive())
+  const [progressPercent, setProgressPercent] = useState<number>(
+    player.getProgress()
+  )
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
   const [burnedCount, setBurnedCount] = useState<number>(
     burnCollection.getAll().length
   )
@@ -38,6 +44,10 @@ export function HomePage() {
     burnCollection.getAll()
   )
   const [searchTerm, setSearchTerm] = useState<string>('')
+  const [historyTracks, setHistoryTracks] = useState<Track[]>(() => {
+    const initialTrack = playlist.getCurrentTrack()
+    return initialTrack ? [initialTrack] : []
+  })
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const savedTheme = localStorage.getItem('flowmusic-theme')
 
@@ -53,16 +63,105 @@ export function HomePage() {
     localStorage.setItem('flowmusic-theme', theme)
   }, [theme])
 
+  const parseDurationToSeconds = (duration: string): number => {
+    const [minutes, seconds] = duration.split(':').map(Number)
+    return minutes * 60 + seconds
+  }
+
+  const formatTime = (totalSeconds: number): string => {
+    const safeSeconds = Math.max(0, totalSeconds)
+    const minutes = Math.floor(safeSeconds / 60)
+    const seconds = safeSeconds % 60
+
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+
+  useEffect(() => {
+    if (!isPlaying || !currentTrack) {
+      return
+    }
+
+    const totalSeconds = parseDurationToSeconds(currentTrack.duration)
+
+    const intervalId = window.setInterval(() => {
+      setElapsedSeconds((previousSeconds) => {
+        const nextElapsedSeconds = Math.min(previousSeconds + 1, totalSeconds)
+        const nextPercent =
+          totalSeconds > 0 ? (nextElapsedSeconds / totalSeconds) * 100 : 0
+
+        player.setProgress(nextPercent)
+        setProgressPercent(nextPercent)
+
+        if (nextElapsedSeconds >= totalSeconds) {
+          const previousTrackId = currentTrack.id
+          const nextTrack = player.next()
+
+          player.setProgress(0)
+
+          if (nextTrack && nextTrack.id !== previousTrackId) {
+            player.play()
+            setHistoryTracks((previousHistory) => {
+              const cleanedHistory = previousHistory.filter(
+                (item) => item.id !== nextTrack.id
+              )
+
+              return [nextTrack, ...cleanedHistory].slice(0, 8)
+            })
+
+            setTimeout(() => {
+              setElapsedSeconds(0)
+              refreshView()
+            }, 0)
+          } else {
+            player.pause()
+            setTimeout(() => {
+              setElapsedSeconds(totalSeconds)
+              refreshView()
+            }, 0)
+          }
+        }
+
+        return nextElapsedSeconds
+      })
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [isPlaying, currentTrack, player])
+
   const refreshView = (): void => {
     setTracks([...playlist.toArray()])
     setCurrentTrack(playlist.getCurrentTrack())
     setIsPlaying(player.isActive())
+    setProgressPercent(player.getProgress())
     setBurnedCount(burnCollection.getAll().length)
     setBurnedTracks(burnCollection.getAll())
   }
 
+  const appendHistory = (track: Track | null): void => {
+    if (!track) {
+      return
+    }
+
+    setHistoryTracks((previousHistory) => {
+      const cleanedHistory = previousHistory.filter(
+        (item) => item.id !== track.id
+      )
+
+      return [track, ...cleanedHistory].slice(0, 8)
+    })
+  }
+
+  const resetProgress = (): void => {
+    player.setProgress(0)
+    setProgressPercent(0)
+    setElapsedSeconds(0)
+  }
+
   const handlePlay = (): void => {
     player.play()
+    appendHistory(player.getCurrentTrack())
     refreshView()
   }
 
@@ -72,22 +171,46 @@ export function HomePage() {
   }
 
   const handleNext = (): void => {
-    player.next()
+    const previousTrackId = currentTrack?.id
+    const nextTrack = player.next()
+
+    resetProgress()
+
+    if (nextTrack && nextTrack.id !== previousTrackId) {
+      appendHistory(nextTrack)
+    }
+
     refreshView()
   }
 
   const handlePrevious = (): void => {
-    player.previous()
+    const previousTrackId = currentTrack?.id
+    const previousTrack = player.previous()
+
+    resetProgress()
+
+    if (previousTrack && previousTrack.id !== previousTrackId) {
+      appendHistory(previousTrack)
+    }
+
     refreshView()
   }
 
   const handleSelectTrack = (trackId: string): void => {
-    player.select(trackId)
+    const wasSelected = player.select(trackId)
+
+    resetProgress()
+
+    if (wasSelected) {
+      appendHistory(player.getCurrentTrack())
+    }
+
     refreshView()
   }
 
   const handleRemoveTrack = (trackId: string): void => {
     playlist.removeById(trackId)
+    resetProgress()
     refreshView()
   }
 
@@ -144,6 +267,9 @@ export function HomePage() {
     )
   })
 
+  const totalTime = currentTrack ? currentTrack.duration : '--:--'
+  const elapsedTime = currentTrack ? formatTime(elapsedSeconds) : '--:--'
+
   return (
     <div className="app-shell">
       <aside className="left-panel">
@@ -167,6 +293,7 @@ export function HomePage() {
           <p>Canciones: {tracks.length}</p>
           <p>Favoritas: {favoriteTracks.length}</p>
           <p>Quemadas: {burnedCount}</p>
+          <p>Historial: {historyTracks.length}</p>
           <p>Estado: {isPlaying ? 'Reproduciendo' : 'En pausa'}</p>
           <p>Tema: {theme === 'dark' ? 'Oscuro' : 'Claro'}</p>
         </div>
@@ -236,6 +363,8 @@ export function HomePage() {
           burnedTracks={burnedTracks}
         />
 
+        <HistoryPanel historyTracks={historyTracks} />
+
         <section className="list-section">
           <div className="section-header">
             <h3>Lista de canciones</h3>
@@ -290,6 +419,18 @@ export function HomePage() {
           </div>
         </section>
       </main>
+
+      <PlayerBar
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        progressPercent={progressPercent}
+        elapsedTime={elapsedTime}
+        totalTime={totalTime}
+        onPrevious={handlePrevious}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onNext={handleNext}
+      />
     </div>
   )
 }

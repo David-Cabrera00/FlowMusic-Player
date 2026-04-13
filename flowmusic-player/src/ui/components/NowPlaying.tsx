@@ -26,6 +26,8 @@ export function NowPlaying({
   onPause,
   onNext
 }: NowPlayingProps) {
+  const canPlayTrack = Boolean(currentTrack?.hasAudioSource())
+
   return (
     <section className="now-playing-card">
       <div className="now-playing-cover-wrap">
@@ -50,9 +52,7 @@ export function NowPlaying({
               : 'Agrega o selecciona una canción para comenzar'}
           </p>
           <small>
-            {currentTrack
-              ? `${elapsedTime} / ${totalTime}`
-              : '00:00 / --:--'}
+            {currentTrack ? `${elapsedTime} / ${totalTime}` : '00:00 / --:--'}
           </small>
         </div>
 
@@ -70,7 +70,7 @@ export function NowPlaying({
             <button
               type="button"
               onClick={onPause}
-              disabled={!currentTrack}
+              disabled={!canPlayTrack}
               className="primary-play-button"
             >
               <Pause size={18} />
@@ -80,7 +80,7 @@ export function NowPlaying({
             <button
               type="button"
               onClick={onPlay}
-              disabled={!currentTrack}
+              disabled={!canPlayTrack}
               className="primary-play-button"
             >
               <Play size={18} />

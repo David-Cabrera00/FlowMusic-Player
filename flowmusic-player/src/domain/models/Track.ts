@@ -6,6 +6,7 @@ export class Track {
   public duration: string
   public cover: string
   public isFavorite: boolean
+  public audioSrc: string
 
   constructor(
     id: string,
@@ -14,7 +15,8 @@ export class Track {
     album: string,
     duration: string,
     cover: string,
-    isFavorite: boolean = false
+    isFavorite: boolean = false,
+    audioSrc: string = ''
   ) {
     this.id = id
     this.title = title
@@ -23,9 +25,14 @@ export class Track {
     this.duration = duration
     this.cover = cover
     this.isFavorite = isFavorite
+    this.audioSrc = audioSrc
   }
 
   toggleFavorite(): void {
     this.isFavorite = !this.isFavorite
+  }
+
+  hasAudioSource(): boolean {
+    return this.audioSrc.trim().length > 0
   }
 }

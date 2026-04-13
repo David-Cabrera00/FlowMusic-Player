@@ -19,6 +19,7 @@ export function TrackForm({
   const [album, setAlbum] = useState('')
   const [duration, setDuration] = useState('')
   const [cover, setCover] = useState('')
+  const [audioSrc, setAudioSrc] = useState('')
   const [position, setPosition] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -29,6 +30,7 @@ export function TrackForm({
     setAlbum('')
     setDuration('')
     setCover('')
+    setAudioSrc('')
     setPosition('')
   }
 
@@ -60,7 +62,9 @@ export function TrackForm({
       artist.trim(),
       album.trim(),
       duration.trim(),
-      cover.trim() || fallbackCover
+      cover.trim() || fallbackCover,
+      false,
+      audioSrc.trim()
     )
   }
 
@@ -117,9 +121,13 @@ export function TrackForm({
 
   return (
     <section className="form-section">
-      <div className="section-header">
-        <h3>Agregar canción</h3>
-        <p>Inserta canciones al inicio, al final o en una posición específica</p>
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow-label">Nueva canción</span>
+          <h3>Agregar canción</h3>
+        </div>
+
+        <p>Inserta canciones al inicio, al final o en una posición específica.</p>
       </div>
 
       <div className="form-grid">
@@ -179,6 +187,17 @@ export function TrackForm({
         </div>
 
         <div className="form-field">
+          <label htmlFor="audioSrc">Audio URL</label>
+          <input
+            id="audioSrc"
+            type="text"
+            value={audioSrc}
+            onChange={(event) => setAudioSrc(event.target.value)}
+            placeholder="Opcional por ahora"
+          />
+        </div>
+
+        <div className="form-field">
           <label htmlFor="position">Posición</label>
           <input
             id="position"
@@ -196,9 +215,15 @@ export function TrackForm({
       {success ? <p className="form-message success">{success}</p> : null}
 
       <div className="form-actions">
-        <button onClick={handleAddToStart}>Agregar al inicio</button>
-        <button onClick={handleAddToEnd}>Agregar al final</button>
-        <button onClick={handleAddToPosition}>Agregar por posición</button>
+        <button type="button" onClick={handleAddToStart}>
+          Agregar al inicio
+        </button>
+        <button type="button" onClick={handleAddToEnd}>
+          Agregar al final
+        </button>
+        <button type="button" onClick={handleAddToPosition}>
+          Agregar por posición
+        </button>
       </div>
     </section>
   )

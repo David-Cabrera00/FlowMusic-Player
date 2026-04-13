@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Track } from '../../domain/models/Track'
 import { BurnedTrack } from '../../domain/models/BurnedTrack'
 import { FlowPlaylist } from '../../domain/services/FlowPlaylist'
@@ -23,6 +23,7 @@ type StoredTrack = {
   duration: string
   cover: string
   isFavorite: boolean
+  audioSrc?: string
 }
 
 type StoredBurnedTrack = {
@@ -44,7 +45,8 @@ function toTrack(data: StoredTrack): Track {
     data.album,
     data.duration,
     data.cover,
-    data.isFavorite
+    data.isFavorite,
+    data.audioSrc ?? ''
   )
 }
 
@@ -56,7 +58,8 @@ function trackToStored(track: Track): StoredTrack {
     album: track.album,
     duration: track.duration,
     cover: track.cover,
-    isFavorite: track.isFavorite
+    isFavorite: track.isFavorite,
+    audioSrc: track.audioSrc
   }
 }
 
@@ -81,7 +84,8 @@ function cloneSeedTracks(): Track[] {
         track.album,
         track.duration,
         track.cover,
-        track.isFavorite
+        track.isFavorite,
+        track.audioSrc
       )
   )
 }
@@ -146,7 +150,16 @@ function loadStoredHistory(): Track[] {
   }
 }
 
+function isSessionAudioSource(audioSrc: string): boolean {
+  return audioSrc.startsWith('blob:')
+}
+
 export default function HomePage() {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const folderInputRef = useRef<HTMLInputElement | null>(null)
+  const shouldAutoPlayRef = useRef(false)
+
   const initialTracks = useMemo(() => loadStoredTracks(), [])
 
   const playlist = useMemo(() => {
@@ -163,11 +176,22 @@ export default function HomePage() {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(
     playlist.getCurrentTrack()
   )
-  const [isPlaying, setIsPlaying] = useState<boolean>(player.isActive())
-  const [progressPercent, setProgressPercent] = useState<number>(
-    player.getProgress()
-  )
+  const [isPlaying, setIsPlaying] = useState<boolean>(false)
+  const [progressPercent, setProgressPercent] = useState<number>(0)
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
+  const [durationSeconds, setDurationSeconds] = useState<number>(() => {
+    const track = playlist.getCurrentTrack()
+    if (!track) {
+      return 0
+    }
+
+    const [minutes, seconds] = track.duration.split(':').map(Number)
+    if (Number.isNaN(minutes) || Number.isNaN(seconds)) {
+      return 0
+    }
+
+    return minutes * 60 + seconds
+  })
   const [burnedTracks, setBurnedTracks] = useState<BurnedTrack[]>(() =>
     loadStoredBurnedTracks()
   )
@@ -195,6 +219,7 @@ export default function HomePage() {
   const [isMuted, setIsMuted] = useState<boolean>(() => {
     return localStorage.getItem(MUTE_STORAGE_KEY) === 'true'
   })
+  const [isImporting, setIsImporting] = useState<boolean>(false)
 
   function parseDurationToSeconds(duration: string): number {
     const parts = duration.split(':').map(Number)
@@ -217,8 +242,6 @@ export default function HomePage() {
   function refreshView(): void {
     setTracks([...playlist.toArray()])
     setCurrentTrack(playlist.getCurrentTrack())
-    setIsPlaying(player.isActive())
-    setProgressPercent(player.getProgress())
   }
 
   function appendHistory(track: Track | null): void {
@@ -241,29 +264,135 @@ export default function HomePage() {
     setElapsedSeconds(0)
   }
 
+  async function readAudioDurationFromFile(
+    file: File
+  ): Promise<{ durationSeconds: number; objectUrl: string }> {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file)
+      const audio = document.createElement('audio')
+
+      audio.preload = 'metadata'
+
+      audio.onloadedmetadata = () => {
+        const realDuration = Number.isFinite(audio.duration)
+          ? Math.floor(audio.duration)
+          : 0
+
+        resolve({
+          durationSeconds: Math.max(0, realDuration),
+          objectUrl
+        })
+      }
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        reject(new Error(`No se pudo leer el archivo: ${file.name}`))
+      }
+
+      audio.src = objectUrl
+    })
+  }
+
+  function createImportedTrack(
+    file: File,
+    audioSrc: string,
+    durationInSeconds: number
+  ): Track {
+    const cleanName = file.name.replace(/\.[^/.]+$/, '')
+    const generatedId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const fallbackCover = `https://picsum.photos/seed/${encodeURIComponent(generatedId)}/300/300`
+    const formattedDuration = formatTime(durationInSeconds)
+
+    return new Track(
+      generatedId,
+      cleanName,
+      'Archivo local',
+      'Importado',
+      formattedDuration,
+      fallbackCover,
+      false,
+      audioSrc
+    )
+  }
+
+  async function importSelectedFiles(fileList: FileList | null): Promise<void> {
+    if (!fileList) {
+      return
+    }
+
+    const audioFiles = Array.from(fileList).filter((file) =>
+      file.type.startsWith('audio/')
+    )
+
+    if (audioFiles.length === 0) {
+      return
+    }
+
+    setIsImporting(true)
+
+    try {
+      const createdTracks: Track[] = []
+
+      for (const file of audioFiles) {
+        const { durationSeconds, objectUrl } = await readAudioDurationFromFile(file)
+        const importedTrack = createImportedTrack(file, objectUrl, durationSeconds)
+        createdTracks.push(importedTrack)
+      }
+
+      createdTracks.forEach((track) => {
+        playlist.addToEnd(track)
+      })
+
+      refreshView()
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  useEffect(() => {
+    const folderInput = folderInputRef.current
+
+    if (folderInput) {
+      folderInput.setAttribute('webkitdirectory', '')
+      folderInput.setAttribute('directory', '')
+    }
+  }, [])
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('flowmusic-theme', theme)
   }, [theme])
 
   useEffect(() => {
+    const persistableTracks = tracks.filter(
+      (track) => !isSessionAudioSource(track.audioSrc)
+    )
+
     localStorage.setItem(
       TRACKS_STORAGE_KEY,
-      JSON.stringify(tracks.map(trackToStored))
+      JSON.stringify(persistableTracks.map(trackToStored))
     )
   }, [tracks])
 
   useEffect(() => {
+    const persistableBurned = burnedTracks.filter(
+      (item) => !isSessionAudioSource(item.track.audioSrc)
+    )
+
     localStorage.setItem(
       BURNED_STORAGE_KEY,
-      JSON.stringify(burnedTracks.map(burnedToStored))
+      JSON.stringify(persistableBurned.map(burnedToStored))
     )
   }, [burnedTracks])
 
   useEffect(() => {
+    const persistableHistory = historyTracks.filter(
+      (track) => !isSessionAudioSource(track.audioSrc)
+    )
+
     localStorage.setItem(
       HISTORY_STORAGE_KEY,
-      JSON.stringify(historyTracks.map(trackToStored))
+      JSON.stringify(persistableHistory.map(trackToStored))
     )
   }, [historyTracks])
 
@@ -276,71 +405,69 @@ export default function HomePage() {
   }, [isMuted])
 
   useEffect(() => {
-    if (!isPlaying || !currentTrack) {
+    const audio = audioRef.current
+
+    if (!audio) {
       return
     }
 
-    const totalSeconds = parseDurationToSeconds(currentTrack.duration)
+    audio.volume = isMuted ? 0 : volume / 100
+  }, [volume, isMuted])
 
-    if (totalSeconds <= 0) {
+  useEffect(() => {
+    const audio = audioRef.current
+
+    if (!audio) {
       return
     }
 
-    const intervalId = window.setInterval(() => {
-      setElapsedSeconds((previousSeconds) => {
-        const nextElapsedSeconds = Math.min(previousSeconds + 1, totalSeconds)
-        const nextPercent = (nextElapsedSeconds / totalSeconds) * 100
+    resetProgress()
 
-        player.setProgress(nextPercent)
-        setProgressPercent(nextPercent)
-
-        if (nextElapsedSeconds >= totalSeconds) {
-          const previousTrackId = currentTrack.id
-          const nextTrack = player.next()
-
-          player.setProgress(0)
-
-          if (nextTrack && nextTrack.id !== previousTrackId) {
-            player.play()
-            appendHistory(nextTrack)
-
-            setTimeout(() => {
-              setElapsedSeconds(0)
-              refreshView()
-            }, 0)
-          } else {
-            player.pause()
-
-            setTimeout(() => {
-              setElapsedSeconds(totalSeconds)
-              refreshView()
-            }, 0)
-          }
-        }
-
-        return nextElapsedSeconds
-      })
-    }, 1000)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
-  }, [isPlaying, currentTrack, player])
-
-  const handlePlay = (): void => {
     if (!currentTrack) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      setDurationSeconds(0)
+      setIsPlaying(false)
+      shouldAutoPlayRef.current = false
       return
     }
 
-    player.play()
-    appendHistory(player.getCurrentTrack())
-    refreshView()
-  }
+    setDurationSeconds(parseDurationToSeconds(currentTrack.duration))
 
-  const handlePause = (): void => {
-    player.pause()
-    refreshView()
-  }
+    if (!currentTrack.hasAudioSource()) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      setIsPlaying(false)
+      shouldAutoPlayRef.current = false
+      return
+    }
+
+    audio.src = currentTrack.audioSrc
+    audio.load()
+
+    if (shouldAutoPlayRef.current) {
+      const playPromise = audio.play()
+
+      if (playPromise) {
+        playPromise
+          .then(() => {
+            player.play()
+            setIsPlaying(true)
+          })
+          .catch(() => {
+            player.pause()
+            setIsPlaying(false)
+          })
+      }
+    } else {
+      player.pause()
+      setIsPlaying(false)
+    }
+
+    shouldAutoPlayRef.current = false
+  }, [currentTrack, player])
 
   const currentIndex = currentTrack
     ? tracks.findIndex((track) => track.id === currentTrack.id)
@@ -349,17 +476,104 @@ export default function HomePage() {
   const canGoPrevious = currentIndex > 0
   const canGoNext = currentIndex >= 0 && currentIndex < tracks.length - 1
 
+  const handleLoadedMetadata = (): void => {
+    const audio = audioRef.current
+
+    if (!audio || !currentTrack) {
+      return
+    }
+
+    const realDuration = Math.floor(audio.duration)
+
+    if (realDuration <= 0) {
+      return
+    }
+
+    setDurationSeconds(realDuration)
+
+    const formattedDuration = formatTime(realDuration)
+
+    if (currentTrack.duration !== formattedDuration) {
+      currentTrack.duration = formattedDuration
+      setTracks([...playlist.toArray()])
+      setCurrentTrack(playlist.getCurrentTrack())
+    }
+  }
+
+  const handleTimeUpdate = (): void => {
+    const audio = audioRef.current
+
+    if (!audio) {
+      return
+    }
+
+    const total = Number.isFinite(audio.duration) ? audio.duration : 0
+    const current = audio.currentTime
+
+    setElapsedSeconds(Math.floor(current))
+
+    const nextPercent = total > 0 ? (current / total) * 100 : 0
+    setProgressPercent(nextPercent)
+    player.setProgress(nextPercent)
+  }
+
+  const handleEnded = (): void => {
+    if (!canGoNext) {
+      player.pause()
+      setIsPlaying(false)
+      setProgressPercent(100)
+      return
+    }
+
+    const nextTrack = player.next()
+    shouldAutoPlayRef.current = true
+    appendHistory(nextTrack)
+    refreshView()
+  }
+
+  const handlePlay = (): void => {
+    if (!currentTrack || !currentTrack.hasAudioSource()) {
+      return
+    }
+
+    const audio = audioRef.current
+
+    if (!audio) {
+      return
+    }
+
+    const playPromise = audio.play()
+
+    if (playPromise) {
+      playPromise
+        .then(() => {
+          player.play()
+          setIsPlaying(true)
+          appendHistory(currentTrack)
+        })
+        .catch(() => {
+          player.pause()
+          setIsPlaying(false)
+        })
+    }
+  }
+
+  const handlePause = (): void => {
+    const audio = audioRef.current
+    audio?.pause()
+    player.pause()
+    setIsPlaying(false)
+  }
+
   const handleNext = (): void => {
     if (!canGoNext) {
       return
     }
 
-    const previousTrackId = currentTrack?.id
     const nextTrack = player.next()
+    shouldAutoPlayRef.current = isPlaying
 
-    resetProgress()
-
-    if (nextTrack && nextTrack.id !== previousTrackId) {
+    if (nextTrack) {
       appendHistory(nextTrack)
     }
 
@@ -371,12 +585,10 @@ export default function HomePage() {
       return
     }
 
-    const previousTrackId = currentTrack?.id
     const previousTrack = player.previous()
+    shouldAutoPlayRef.current = isPlaying
 
-    resetProgress()
-
-    if (previousTrack && previousTrack.id !== previousTrackId) {
+    if (previousTrack) {
       appendHistory(previousTrack)
     }
 
@@ -385,8 +597,7 @@ export default function HomePage() {
 
   const handleSelectTrack = (trackId: string): void => {
     const wasSelected = player.select(trackId)
-
-    resetProgress()
+    shouldAutoPlayRef.current = isPlaying
 
     if (wasSelected) {
       appendHistory(player.getCurrentTrack())
@@ -410,6 +621,18 @@ export default function HomePage() {
       return
     }
 
+    const wasCurrentTrack = currentTrack?.id === trackId
+
+    if (selectedTrack.audioSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(selectedTrack.audioSrc)
+    }
+
+    if (wasCurrentTrack) {
+      audioRef.current?.pause()
+      player.pause()
+      setIsPlaying(false)
+    }
+
     const updatedBurnedTracks = burnedTracks.filter(
       (item) => item.track.id !== trackId
     )
@@ -420,7 +643,6 @@ export default function HomePage() {
       previousHistory.filter((item) => item.id !== trackId)
     )
 
-    resetProgress()
     refreshView()
   }
 
@@ -483,6 +705,21 @@ export default function HomePage() {
     setIsMuted((previous) => !previous)
   }
 
+  const handleOpenFilesImport = (): void => {
+    fileInputRef.current?.click()
+  }
+
+  const handleOpenFolderImport = (): void => {
+    folderInputRef.current?.click()
+  }
+
+  const handleFilesSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): Promise<void> => {
+    await importSelectedFiles(event.target.files)
+    event.target.value = ''
+  }
+
   const favoriteTracks = tracks.filter((track) => track.isFavorite)
 
   const filteredTracks = tracks.filter((track) => {
@@ -499,7 +736,12 @@ export default function HomePage() {
     )
   })
 
-  const totalTime = currentTrack ? currentTrack.duration : '--:--'
+  const totalTime = currentTrack
+    ? durationSeconds > 0
+      ? formatTime(durationSeconds)
+      : currentTrack.duration
+    : '--:--'
+
   const elapsedTime = currentTrack ? formatTime(elapsedSeconds) : '--:--'
 
   return (
@@ -518,8 +760,11 @@ export default function HomePage() {
         <main className="center-panel">
           <Header
             searchTerm={searchTerm}
+            isImporting={isImporting}
             onSearchChange={handleSearchChange}
             onClearSearch={handleClearSearch}
+            onImportFiles={handleOpenFilesImport}
+            onImportFolder={handleOpenFolderImport}
           />
 
           <NowPlaying
@@ -552,14 +797,15 @@ export default function HomePage() {
             onRemove={handleRemoveTrack}
           />
         </main>
-        <aside className="right-panel">
-        <CollectionPanels
-          favoriteTracks={favoriteTracks}
-          burnedTracks={burnedTracks}
-        />
 
-        <HistoryPanel historyTracks={historyTracks} />
-      </aside>
+        <aside className="right-panel">
+          <CollectionPanels
+            favoriteTracks={favoriteTracks}
+            burnedTracks={burnedTracks}
+          />
+
+          <HistoryPanel historyTracks={historyTracks} />
+        </aside>
       </div>
 
       <PlayerBar
@@ -578,6 +824,35 @@ export default function HomePage() {
         onNext={handleNext}
         onVolumeChange={handleVolumeChange}
         onToggleMute={handleToggleMute}
+      />
+
+      <audio
+        ref={audioRef}
+        hidden
+        preload="metadata"
+        onLoadedMetadata={handleLoadedMetadata}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      />
+
+      <input
+        ref={fileInputRef}
+        hidden
+        type="file"
+        accept="audio/*"
+        multiple
+        onChange={handleFilesSelected}
+      />
+
+      <input
+        ref={folderInputRef}
+        hidden
+        type="file"
+        accept="audio/*"
+        multiple
+        onChange={handleFilesSelected}
       />
     </div>
   )

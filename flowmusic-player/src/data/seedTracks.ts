@@ -7,7 +7,9 @@ export const seedTracks: Track[] = [
     'Valeria Sound',
     'Noches Claras',
     '3:42',
-    'https://picsum.photos/seed/flowmusic1/300/300'
+    'https://picsum.photos/seed/flowmusic1/300/300',
+    false,
+    ''
   ),
   new Track(
     'track-002',
@@ -15,7 +17,9 @@ export const seedTracks: Track[] = [
     'Neon Avenue',
     'City Waves',
     '4:08',
-    'https://picsum.photos/seed/flowmusic2/300/300'
+    'https://picsum.photos/seed/flowmusic2/300/300',
+    false,
+    ''
   ),
   new Track(
     'track-003',
@@ -23,6 +27,8 @@ export const seedTracks: Track[] = [
     'Blue Motion',
     'Skyline',
     '2:57',
-    'https://picsum.photos/seed/flowmusic3/300/300'
+    'https://picsum.photos/seed/flowmusic3/300/300',
+    false,
+    ''
   )
 ]

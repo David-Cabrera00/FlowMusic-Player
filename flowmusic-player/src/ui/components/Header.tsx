@@ -1,6 +1,9 @@
 import { FolderOpen, Search, Upload, X } from 'lucide-react'
+import type { SidebarSection } from './Sidebar'
 
 interface HeaderProps {
+  title: string
+  section: SidebarSection
   searchTerm: string
   isImporting: boolean
   onSearchChange: (value: string) => void
@@ -10,6 +13,8 @@ interface HeaderProps {
 }
 
 export function Header({
+  title,
+  section,
   searchTerm,
   isImporting,
   onSearchChange,
@@ -17,11 +22,14 @@ export function Header({
   onImportFiles,
   onImportFolder
 }: HeaderProps) {
+  const showImportButtons =
+    section === 'inicio' || section === 'biblioteca'
+
   return (
     <header className="library-header">
       <div className="library-header-copy">
         <span className="eyebrow-label">FlowMusic Player</span>
-        <h2>Biblioteca</h2>
+        <h2>{title}</h2>
       </div>
 
       <div className="library-toolbar">
@@ -31,30 +39,34 @@ export function Header({
             type="text"
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar "
+            placeholder="Buscar"
           />
         </div>
 
         <div className="library-toolbar-buttons">
-          <button
-            className="library-toolbar-button"
-            type="button"
-            onClick={onImportFiles}
-            disabled={isImporting}
-          >
-            <Upload size={16} />
-            <span>{isImporting ? 'Importando...' : 'Importar archivos'}</span>
-          </button>
+          {showImportButtons ? (
+            <>
+              <button
+                className="library-toolbar-button"
+                type="button"
+                onClick={onImportFiles}
+                disabled={isImporting}
+              >
+                <Upload size={16} />
+                <span>{isImporting ? 'Importando...' : 'Importar archivos'}</span>
+              </button>
 
-          <button
-            className="library-toolbar-button"
-            type="button"
-            onClick={onImportFolder}
-            disabled={isImporting}
-          >
-            <FolderOpen size={16} />
-            <span>Importar carpeta</span>
-          </button>
+              <button
+                className="library-toolbar-button"
+                type="button"
+                onClick={onImportFolder}
+                disabled={isImporting}
+              >
+                <FolderOpen size={16} />
+                <span>Importar carpeta</span>
+              </button>
+            </>
+          ) : null}
 
           <button
             className="library-clear-button"

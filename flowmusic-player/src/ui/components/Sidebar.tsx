@@ -9,9 +9,18 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 
+export type SidebarSection =
+  | 'inicio'
+  | 'biblioteca'
+  | 'favoritas'
+  | 'quemadas'
+  | 'historial'
+
 interface SidebarProps {
   theme: 'dark' | 'light'
+  activeSection: SidebarSection
   onToggleTheme: () => void
+  onNavigate: (section: SidebarSection) => void
   totalTracks: number
   favoriteCount: number
   burnedCount: number
@@ -21,7 +30,9 @@ interface SidebarProps {
 
 export function Sidebar({
   theme,
+  activeSection,
   onToggleTheme,
+  onNavigate,
   totalTracks,
   favoriteCount,
   burnedCount,
@@ -44,27 +55,47 @@ export function Sidebar({
       <ThemeToggle theme={theme} onToggle={onToggleTheme} />
 
       <nav className="sidebar-nav">
-        <button className="sidebar-link active" type="button">
+        <button
+          className={`sidebar-link ${activeSection === 'inicio' ? 'active' : ''}`}
+          type="button"
+          onClick={() => onNavigate('inicio')}
+        >
           <Home size={18} />
           <span>Inicio</span>
         </button>
 
-        <button className="sidebar-link" type="button">
+        <button
+          className={`sidebar-link ${activeSection === 'biblioteca' ? 'active' : ''}`}
+          type="button"
+          onClick={() => onNavigate('biblioteca')}
+        >
           <LibraryBig size={18} />
           <span>Biblioteca</span>
         </button>
 
-        <button className="sidebar-link" type="button">
+        <button
+          className={`sidebar-link ${activeSection === 'favoritas' ? 'active' : ''}`}
+          type="button"
+          onClick={() => onNavigate('favoritas')}
+        >
           <Heart size={18} />
           <span>Favoritas</span>
         </button>
 
-        <button className="sidebar-link" type="button">
+        <button
+          className={`sidebar-link ${activeSection === 'quemadas' ? 'active' : ''}`}
+          type="button"
+          onClick={() => onNavigate('quemadas')}
+        >
           <Flame size={18} />
           <span>Quemadas</span>
         </button>
 
-        <button className="sidebar-link" type="button">
+        <button
+          className={`sidebar-link ${activeSection === 'historial' ? 'active' : ''}`}
+          type="button"
+          onClick={() => onNavigate('historial')}
+        >
           <History size={18} />
           <span>Historial</span>
         </button>

@@ -4,7 +4,8 @@ import { BurnedTrack } from '../../domain/models/BurnedTrack'
 import { FlowPlaylist } from '../../domain/services/FlowPlaylist'
 import { PlayerController } from '../../domain/services/PlayerController'
 import { seedTracks } from '../../data/seedTracks'
-import { Sidebar } from '../components/Sidebar'
+import { Sidebar} from '../components/Sidebar'
+import type { SidebarSection } from '../components/Sidebar'
 import { Header } from '../components/Header'
 import { NowPlaying } from '../components/NowPlaying'
 import { TrackForm } from '../components/TrackForm'
@@ -220,6 +221,8 @@ export default function HomePage() {
     return localStorage.getItem(MUTE_STORAGE_KEY) === 'true'
   })
   const [isImporting, setIsImporting] = useState<boolean>(false)
+  const [activeSection, setActiveSection] =
+    useState<SidebarSection>('inicio')
 
   function parseDurationToSeconds(duration: string): number {
     const parts = duration.split(':').map(Number)
@@ -342,6 +345,10 @@ export default function HomePage() {
       createdTracks.forEach((track) => {
         playlist.addToEnd(track)
       })
+
+      if (createdTracks.length > 0) {
+        setActiveSection('biblioteca')
+      }
 
       refreshView()
     } finally {
@@ -669,16 +676,19 @@ export default function HomePage() {
 
   const handleAddToStart = (track: Track): void => {
     playlist.addToStart(track)
+    setActiveSection('biblioteca')
     refreshView()
   }
 
   const handleAddToEnd = (track: Track): void => {
     playlist.addToEnd(track)
+    setActiveSection('biblioteca')
     refreshView()
   }
 
   const handleAddToPosition = (track: Track, position: number): void => {
     playlist.addAtPosition(track, position)
+    setActiveSection('biblioteca')
     refreshView()
   }
 
@@ -720,21 +730,35 @@ export default function HomePage() {
     event.target.value = ''
   }
 
-  const favoriteTracks = tracks.filter((track) => track.isFavorite)
+  const handleNavigateSection = (section: SidebarSection): void => {
+    setActiveSection(section)
+    setSearchTerm('')
+  }
 
-  const filteredTracks = tracks.filter((track) => {
+  const favoriteTracks = tracks.filter((track) => track.isFavorite)
+  const burnedOnlyTracks = burnedTracks.map((item) => item.track)
+  const historyOnlyTracks = historyTracks
+
+  function filterTracksBySearch(sourceTracks: Track[]): Track[] {
     const normalizedSearch = searchTerm.trim().toLowerCase()
 
     if (!normalizedSearch) {
-      return true
+      return sourceTracks
     }
 
-    return (
-      track.title.toLowerCase().includes(normalizedSearch) ||
-      track.artist.toLowerCase().includes(normalizedSearch) ||
-      track.album.toLowerCase().includes(normalizedSearch)
-    )
-  })
+    return sourceTracks.filter((track) => {
+      return (
+        track.title.toLowerCase().includes(normalizedSearch) ||
+        track.artist.toLowerCase().includes(normalizedSearch) ||
+        track.album.toLowerCase().includes(normalizedSearch)
+      )
+    })
+  }
+
+  const libraryTracks = filterTracksBySearch(tracks)
+  const filteredFavorites = filterTracksBySearch(favoriteTracks)
+  const filteredBurned = filterTracksBySearch(burnedOnlyTracks)
+  const filteredHistory = filterTracksBySearch(historyOnlyTracks)
 
   const totalTime = currentTrack
     ? durationSeconds > 0
@@ -744,12 +768,22 @@ export default function HomePage() {
 
   const elapsedTime = currentTrack ? formatTime(elapsedSeconds) : '--:--'
 
+  const sectionTitleMap: Record<SidebarSection, string> = {
+    inicio: 'Inicio',
+    biblioteca: 'Biblioteca',
+    favoritas: 'Favoritas',
+    quemadas: 'Quemadas',
+    historial: 'Historial'
+  }
+
   return (
     <div className="app-shell">
       <div className="dashboard-layout">
         <Sidebar
           theme={theme}
+          activeSection={activeSection}
           onToggleTheme={handleToggleTheme}
+          onNavigate={handleNavigateSection}
           totalTracks={tracks.length}
           favoriteCount={favoriteTracks.length}
           burnedCount={burnedTracks.length}
@@ -759,6 +793,8 @@ export default function HomePage() {
 
         <main className="center-panel">
           <Header
+            title={sectionTitleMap[activeSection]}
+            section={activeSection}
             searchTerm={searchTerm}
             isImporting={isImporting}
             onSearchChange={handleSearchChange}
@@ -780,22 +816,99 @@ export default function HomePage() {
             onNext={handleNext}
           />
 
-          <TrackForm
-            playlistSize={tracks.length}
-            onAddToStart={handleAddToStart}
-            onAddToEnd={handleAddToEnd}
-            onAddToPosition={handleAddToPosition}
-          />
+          {activeSection === 'inicio' || activeSection === 'biblioteca' ? (
+            <TrackForm
+              playlistSize={tracks.length}
+              onAddToStart={handleAddToStart}
+              onAddToEnd={handleAddToEnd}
+              onAddToPosition={handleAddToPosition}
+            />
+          ) : null}
 
-          <TrackList
-            tracks={filteredTracks}
-            currentTrackId={currentTrack?.id ?? null}
-            hasTracks={tracks.length > 0}
-            onSelect={handleSelectTrack}
-            onToggleFavorite={handleToggleFavorite}
-            onBurn={handleBurnTrack}
-            onRemove={handleRemoveTrack}
-          />
+          {activeSection === 'inicio' ? (
+            <TrackList
+              tracks={libraryTracks}
+              totalSourceCount={tracks.length}
+              currentTrackId={currentTrack?.id ?? null}
+              title="Toda la biblioteca"
+              subtitle="Administra la secuencia principal del reproductor."
+              emptyTitle="Tu biblioteca está vacía"
+              emptyDescription="Agrega una nueva canción desde el formulario o importa archivos locales para comenzar."
+              emptySearchMessage="No se encontraron canciones con esa búsqueda."
+              onSelect={handleSelectTrack}
+              onToggleFavorite={handleToggleFavorite}
+              onBurn={handleBurnTrack}
+              onRemove={handleRemoveTrack}
+            />
+          ) : null}
+
+          {activeSection === 'biblioteca' ? (
+            <TrackList
+              tracks={libraryTracks}
+              totalSourceCount={tracks.length}
+              currentTrackId={currentTrack?.id ?? null}
+              title="Biblioteca completa"
+              subtitle="Todas las canciones disponibles en tu reproductor."
+              emptyTitle="Tu biblioteca está vacía"
+              emptyDescription="Agrega una nueva canción o importa archivos desde tu computador."
+              emptySearchMessage="No se encontraron canciones con esa búsqueda."
+              onSelect={handleSelectTrack}
+              onToggleFavorite={handleToggleFavorite}
+              onBurn={handleBurnTrack}
+              onRemove={handleRemoveTrack}
+            />
+          ) : null}
+
+          {activeSection === 'favoritas' ? (
+            <TrackList
+              tracks={filteredFavorites}
+              totalSourceCount={favoriteTracks.length}
+              currentTrackId={currentTrack?.id ?? null}
+              title="Canciones favoritas"
+              subtitle="Tu selección personal de canciones destacadas."
+              emptyTitle="No tienes favoritas todavía"
+              emptyDescription="Marca canciones como favoritas desde la biblioteca para verlas aquí."
+              emptySearchMessage="No se encontraron favoritas con esa búsqueda."
+              onSelect={handleSelectTrack}
+              onToggleFavorite={handleToggleFavorite}
+              onBurn={handleBurnTrack}
+              onRemove={handleRemoveTrack}
+            />
+          ) : null}
+
+          {activeSection === 'quemadas' ? (
+            <TrackList
+              tracks={filteredBurned}
+              totalSourceCount={burnedOnlyTracks.length}
+              currentTrackId={currentTrack?.id ?? null}
+              title="Canciones quemadas"
+              subtitle="Colección especial registrada dentro del sistema."
+              emptyTitle="No has quemado canciones"
+              emptyDescription="Usa la acción “Quemar” sobre cualquier canción para verla aquí."
+              emptySearchMessage="No se encontraron canciones quemadas con esa búsqueda."
+              onSelect={handleSelectTrack}
+              onToggleFavorite={handleToggleFavorite}
+              onBurn={handleBurnTrack}
+              onRemove={handleRemoveTrack}
+            />
+          ) : null}
+
+          {activeSection === 'historial' ? (
+            <TrackList
+              tracks={filteredHistory}
+              totalSourceCount={historyOnlyTracks.length}
+              currentTrackId={currentTrack?.id ?? null}
+              title="Historial de reproducción"
+              subtitle="Canciones reproducidas o seleccionadas recientemente."
+              emptyTitle="No hay historial todavía"
+              emptyDescription="Reproduce o selecciona canciones para construir el historial del reproductor."
+              emptySearchMessage="No se encontraron elementos del historial con esa búsqueda."
+              onSelect={handleSelectTrack}
+              onToggleFavorite={handleToggleFavorite}
+              onBurn={handleBurnTrack}
+              onRemove={handleRemoveTrack}
+            />
+          ) : null}
         </main>
 
         <aside className="right-panel">

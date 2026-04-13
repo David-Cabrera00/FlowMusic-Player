@@ -3,8 +3,13 @@ import { TrackCard } from './TrackCard'
 
 interface TrackListProps {
   tracks: Track[]
+  totalSourceCount: number
   currentTrackId: string | null
-  hasTracks: boolean
+  title: string
+  subtitle: string
+  emptyTitle: string
+  emptyDescription: string
+  emptySearchMessage: string
   onSelect: (trackId: string) => void
   onToggleFavorite: (trackId: string) => void
   onBurn: (track: Track) => void
@@ -13,8 +18,13 @@ interface TrackListProps {
 
 export function TrackList({
   tracks,
+  totalSourceCount,
   currentTrackId,
-  hasTracks,
+  title,
+  subtitle,
+  emptyTitle,
+  emptyDescription,
+  emptySearchMessage,
   onSelect,
   onToggleFavorite,
   onBurn,
@@ -24,25 +34,20 @@ export function TrackList({
     <section className="playlist-section-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow-label">Playlist</span>
-          <h3>Lista de canciones</h3>
+          <span className="eyebrow-label">Colección</span>
+          <h3>{title}</h3>
         </div>
 
-        <p>Administra la secuencia principal del reproductor.</p>
+        <p>{subtitle}</p>
       </div>
 
-      {!hasTracks ? (
+      {totalSourceCount === 0 ? (
         <div className="playlist-empty-box">
-          <h4>Tu playlist está vacía</h4>
-          <p>
-            Agrega una nueva canción desde el formulario para comenzar a usar
-            FlowMusic Player.
-          </p>
+          <h4>{emptyTitle}</h4>
+          <p>{emptyDescription}</p>
         </div>
       ) : tracks.length === 0 ? (
-        <p className="empty-state">
-          No se encontraron canciones con esa búsqueda.
-        </p>
+        <p className="empty-state">{emptySearchMessage}</p>
       ) : (
         <div className="playlist-track-list">
           {tracks.map((track, index) => (

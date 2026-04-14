@@ -159,7 +159,7 @@ export function TrackForm({
             type="text"
             value={title}
             onChange={(event) => setTitle(normalizeTextInput(event.target.value))}
-            placeholder="Ejemplo: Aurora Urbana"
+            placeholder="Ejemplo: Colors"
           />
         </div>
 
@@ -170,7 +170,7 @@ export function TrackForm({
             type="text"
             value={artist}
             onChange={(event) => setArtist(normalizeTextInput(event.target.value))}
-            placeholder="Ejemplo: Nova Beat"
+            placeholder="Ejemplo: EnergySound"
           />
         </div>
 
@@ -181,7 +181,7 @@ export function TrackForm({
             type="text"
             value={album}
             onChange={(event) => setAlbum(normalizeTextInput(event.target.value))}
-            placeholder="Ejemplo: Skyline Dreams"
+            placeholder="Ejemplo: Flow Session"
           />
         </div>
 
@@ -214,7 +214,7 @@ export function TrackForm({
             type="text"
             value={audioSrc}
             onChange={(event) => setAudioSrc(normalizeTextInput(event.target.value))}
-            placeholder="Opcional por ahora"
+            placeholder="Opcional"
           />
         </div>
 

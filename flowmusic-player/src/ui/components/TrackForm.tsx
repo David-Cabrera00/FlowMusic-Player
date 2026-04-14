@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { Track } from '../../domain/models/Track'
 
 interface TrackFormProps {
@@ -18,11 +18,13 @@ export function TrackForm({
   const [artist, setArtist] = useState('')
   const [album, setAlbum] = useState('')
   const [duration, setDuration] = useState('')
-  const [cover, setCover] = useState('')
-  const [audioSrc, setAudioSrc] = useState('')
   const [position, setPosition] = useState('')
+  const [audioFile, setAudioFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [isReadingDuration, setIsReadingDuration] = useState(false)
+
+  const audioInputRef = useRef<HTMLInputElement | null>(null)
 
   const normalizeTextInput = (value: string): string => {
     return value.replace(/^\s+/, '')
@@ -30,10 +32,6 @@ export function TrackForm({
 
   const normalizeStoredText = (value: string): string => {
     return value.trim().replace(/\s{2,}/g, ' ')
-  }
-
-  const sanitizeDurationInput = (value: string): string => {
-    return value.replace(/\s+/g, '').replace(/[^0-9:]/g, '')
   }
 
   const sanitizePositionInput = (value: string): string => {
@@ -45,27 +43,92 @@ export function TrackForm({
     setArtist('')
     setAlbum('')
     setDuration('')
-    setCover('')
-    setAudioSrc('')
     setPosition('')
+    setAudioFile(null)
+
+    if (audioInputRef.current) {
+      audioInputRef.current.value = ''
+    }
+  }
+
+  const formatTime = (totalSeconds: number): string => {
+    const safeSeconds = Math.max(0, totalSeconds)
+    const minutes = Math.floor(safeSeconds / 60)
+    const seconds = safeSeconds % 60
+
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+
+  const readAudioDuration = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const tempUrl = URL.createObjectURL(file)
+      const audio = document.createElement('audio')
+
+      audio.preload = 'metadata'
+
+      audio.onloadedmetadata = () => {
+        const realDuration = Number.isFinite(audio.duration)
+          ? Math.floor(audio.duration)
+          : 0
+
+        URL.revokeObjectURL(tempUrl)
+        resolve(formatTime(realDuration))
+      }
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(tempUrl)
+        reject(new Error('No se pudo leer la duración del audio.'))
+      }
+
+      audio.src = tempUrl
+    })
+  }
+
+  const handleAudioFileChange = async (
+    event: ChangeEvent<HTMLInputElement>
+  ): Promise<void> => {
+    const selectedFile = event.target.files?.[0] ?? null
+
+    setAudioFile(selectedFile)
+    setDuration('')
+    setError('')
+    setSuccess('')
+
+    if (!selectedFile) {
+      return
+    }
+
+    setIsReadingDuration(true)
+
+    try {
+      const detectedDuration = await readAudioDuration(selectedFile)
+      setDuration(detectedDuration)
+    } catch {
+      setError('No se pudo leer el archivo de audio seleccionado.')
+    } finally {
+      setIsReadingDuration(false)
+    }
   }
 
   const validateForm = (): boolean => {
     const cleanTitle = normalizeStoredText(title)
     const cleanArtist = normalizeStoredText(artist)
     const cleanAlbum = normalizeStoredText(album)
-    const cleanDuration = duration.trim()
 
-    if (!cleanTitle || !cleanArtist || !cleanAlbum || !cleanDuration) {
+    if (!cleanTitle || !cleanArtist || !cleanAlbum) {
       setError('Completa todos los campos obligatorios.')
       setSuccess('')
       return false
     }
 
-    const durationPattern = /^\d{1,2}:\d{2}$/
+    if (!audioFile) {
+      setError('Debes seleccionar un archivo de audio.')
+      setSuccess('')
+      return false
+    }
 
-    if (!durationPattern.test(cleanDuration)) {
-      setError('La duración debe tener formato mm:ss.')
+    if (!duration) {
+      setError('No se pudo calcular la duración del audio.')
       setSuccess('')
       return false
     }
@@ -75,6 +138,7 @@ export function TrackForm({
 
   const buildTrack = (): Track => {
     const generatedId = `track-${Date.now()}`
+    const audioObjectUrl = URL.createObjectURL(audioFile as File)
     const fallbackCover = `https://picsum.photos/seed/${generatedId}/300/300`
 
     return new Track(
@@ -82,10 +146,10 @@ export function TrackForm({
       normalizeStoredText(title),
       normalizeStoredText(artist),
       normalizeStoredText(album),
-      duration.trim(),
-      normalizeStoredText(cover) || fallbackCover,
+      duration,
+      fallbackCover,
       false,
-      normalizeStoredText(audioSrc)
+      audioObjectUrl
     )
   }
 
@@ -122,21 +186,24 @@ export function TrackForm({
       return
     }
 
-    const numericPosition = Number(position)
+    const userPosition = Number(position)
+    const maxUserPosition = playlistSize + 1
 
     if (
-      Number.isNaN(numericPosition) ||
-      numericPosition < 0 ||
-      numericPosition > playlistSize
+      Number.isNaN(userPosition) ||
+      userPosition < 1 ||
+      userPosition > maxUserPosition
     ) {
-      setError(`La posición debe estar entre 0 y ${playlistSize}.`)
+      setError(`La posición debe estar entre 1 y ${maxUserPosition}.`)
       setSuccess('')
       return
     }
 
-    onAddToPosition(buildTrack(), numericPosition)
+    const internalPosition = userPosition - 1
+
+    onAddToPosition(buildTrack(), internalPosition)
     setError('')
-    setSuccess('Canción agregada en la posición indicada.')
+    setSuccess(`Canción agregada en la posición ${userPosition}.`)
     clearForm()
   }
 
@@ -159,7 +226,7 @@ export function TrackForm({
             type="text"
             value={title}
             onChange={(event) => setTitle(normalizeTextInput(event.target.value))}
-            placeholder="Ejemplo: Colors"
+            placeholder="Ejemplo: Aurora Urbana"
           />
         </div>
 
@@ -170,7 +237,7 @@ export function TrackForm({
             type="text"
             value={artist}
             onChange={(event) => setArtist(normalizeTextInput(event.target.value))}
-            placeholder="Ejemplo: EnergySound"
+            placeholder="Ejemplo: Nova Beat"
           />
         </div>
 
@@ -181,7 +248,30 @@ export function TrackForm({
             type="text"
             value={album}
             onChange={(event) => setAlbum(normalizeTextInput(event.target.value))}
-            placeholder="Ejemplo: Flow Session"
+            placeholder="Ejemplo: Skyline Dreams"
+          />
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="audioFile">Archivo de audio</label>
+
+          <div className="file-picker">
+            <label htmlFor="audioFile" className="file-picker-button">
+              {audioFile ? 'Cambiar audio' : 'Elegir audio'}
+            </label>
+
+            <span className={`file-picker-name ${audioFile ? 'selected' : ''}`}>
+              {audioFile ? audioFile.name : 'Ningún archivo seleccionado'}
+            </span>
+          </div>
+
+          <input
+            ref={audioInputRef}
+            id="audioFile"
+            className="file-input-hidden"
+            type="file"
+            accept="audio/*"
+            onChange={handleAudioFileChange}
           />
         </div>
 
@@ -190,31 +280,9 @@ export function TrackForm({
           <input
             id="duration"
             type="text"
-            value={duration}
-            onChange={(event) => setDuration(sanitizeDurationInput(event.target.value))}
-            placeholder="03:45"
-          />
-        </div>
-
-        <div className="form-field">
-          <label htmlFor="cover">Portada URL</label>
-          <input
-            id="cover"
-            type="text"
-            value={cover}
-            onChange={(event) => setCover(normalizeTextInput(event.target.value))}
-            placeholder="Opcional"
-          />
-        </div>
-
-        <div className="form-field">
-          <label htmlFor="audioSrc">Audio URL</label>
-          <input
-            id="audioSrc"
-            type="text"
-            value={audioSrc}
-            onChange={(event) => setAudioSrc(normalizeTextInput(event.target.value))}
-            placeholder="Opcional"
+            value={isReadingDuration ? 'Leyendo audio...' : duration}
+            readOnly
+            placeholder="Se calcula automáticamente"
           />
         </div>
 
@@ -226,7 +294,7 @@ export function TrackForm({
             inputMode="numeric"
             value={position}
             onChange={(event) => setPosition(sanitizePositionInput(event.target.value))}
-            placeholder={`0 a ${playlistSize}`}
+            placeholder={`1 a ${playlistSize + 1}`}
           />
         </div>
       </div>

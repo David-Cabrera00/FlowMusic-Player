@@ -670,6 +670,49 @@ input {
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
 }
 
+.file-input-hidden {
+  display: none !important;
+}
+
+.file-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  border: 1px solid var(--border-soft);
+}
+
+.file-picker-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.file-picker-name {
+  min-width: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-picker-name.selected {
+  color: var(--text-main);
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;
